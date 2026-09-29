@@ -1,0 +1,344 @@
+import { Request } from 'express';
+
+// ==========================================
+// ENUMS & CONSTANTES DE ROL Y ESTADO
+// ==========================================
+export type RolUsuario = 'ADMINISTRADOR' | 'ADMINISTRATIVO' | 'DOCENTE' | 'ESTUDIANTE';
+export type EstadoUsuario = 'ACTIVO' | 'INACTIVO';
+export type DiaSemana = 'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES' | 'SABADO' | 'DOMINGO';
+export type EstadoMatricula = 'ACTIVA' | 'CANCELADA' | 'RETIRADA';
+export type MetodoPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'ANULADO';
+export type EstadoSesionAsistencia = 'ABIERTA' | 'CERRADA';
+export type EstadoAsistencia = 'PRESENTE' | 'AUSENTE' | 'TARDANZA';
+export type EstadoEvaluacion = 'BORRADOR' | 'PUBLICADA';
+
+// ==========================================
+// ENTIDADES DE USUARIOS Y PERFILES
+// ==========================================
+export interface IUsuario {
+  id: number;
+  nombre_usuario: string;
+  password_hash: string;
+  rol: RolUsuario;
+  estado: EstadoUsuario;
+}
+
+export interface IAdministrador {
+  id: number;
+  usuario_id: number;
+  nombres: string;
+  apellidos: string;
+  dni: string;
+  correo: string | null;
+}
+
+export interface IPersonalAdministrativo {
+  id: number;
+  usuario_id: number;
+  nombres: string;
+  apellidos: string;
+  dni: string;
+  correo: string | null;
+}
+
+export interface IDocente {
+  id: number;
+  usuario_id: number;
+  codigo_docente: string;
+  nombres: string;
+  apellidos: string;
+  dni: string;
+  telefono: string | null;
+  correo: string | null;
+}
+
+export interface IEstudiante {
+  id: number;
+  usuario_id: number;
+  codigo_estudiante: string;
+  nombres: string;
+  apellidos: string;
+  dni: string;
+  fecha_nacimiento: string | Date;
+  telefono: string | null;
+  correo: string | null;
+  direccion: string | null;
+  estado: EstadoUsuario;
+}
+
+// Tipo unión para cualquier perfil asociado
+export type PerfilUsuario = IAdministrador | IPersonalAdministrativo | IDocente | IEstudiante;
+
+// ==========================================
+// DTOs DE AUTENTICACIÓN
+// ==========================================
+export interface LoginDTO {
+  nombre_usuario: string;
+  password: string;
+}
+
+export interface UsuarioAutenticado {
+  id: number;
+  nombre_usuario: string;
+  rol: RolUsuario;
+  estado: EstadoUsuario;
+  perfil: PerfilUsuario | null;
+}
+
+export interface LoginResponseDTO {
+  token: string;
+  usuario: UsuarioAutenticado;
+}
+
+export interface JWTPayload {
+  id: number;
+  nombre_usuario: string;
+  rol: RolUsuario;
+  perfil_id?: number;
+}
+
+// ==========================================
+// CURSOS (ENTIDADES Y DTOs)
+// ==========================================
+export interface ICurso {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  estado: EstadoUsuario;
+}
+
+export interface CreateCursoDTO {
+  nombre: string;
+  descripcion?: string;
+}
+
+export interface UpdateCursoDTO {
+  nombre?: string;
+  descripcion?: string;
+  estado?: EstadoUsuario;
+}
+
+// ==========================================
+// CICLOS ACADÉMICOS (ENTIDADES Y DTOs)
+// ==========================================
+export interface ICicloAcademico {
+  id: number;
+  nombre: string;
+  fecha_inicio: string | Date;
+  fecha_fin: string | Date;
+  estado: EstadoUsuario;
+}
+
+export interface CreateCicloDTO {
+  nombre: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+}
+
+export interface UpdateCicloDTO {
+  nombre?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  estado?: EstadoUsuario;
+}
+
+// ==========================================
+// HORARIOS (ENTIDADES Y DTOs)
+// ==========================================
+export interface IHorario {
+  id: number;
+  grupo_id: number;
+  dia_semana: DiaSemana;
+  hora_inicio: string;
+  hora_fin: string;
+  aula: string;
+}
+
+export interface CreateHorarioDTO {
+  grupo_id: number;
+  dia_semana: DiaSemana;
+  hora_inicio: string;
+  hora_fin: string;
+  aula: string;
+}
+
+export interface UpdateHorarioDTO {
+  dia_semana?: DiaSemana;
+  hora_inicio?: string;
+  hora_fin?: string;
+  aula?: string;
+}
+
+// ==========================================
+// GRUPOS (ENTIDADES Y DTOs)
+// ==========================================
+export interface IGrupo {
+  id: number;
+  nombre: string;
+  curso_id: number;
+  docente_id: number;
+  ciclo_id: number;
+  capacidad: number;
+  estado: EstadoUsuario;
+}
+
+export interface CreateGrupoDTO {
+  nombre: string;
+  curso_id: number;
+  docente_id: number;
+  ciclo_id: number;
+  capacidad?: number;
+}
+
+export interface UpdateGrupoDTO {
+  nombre?: string;
+  curso_id?: number;
+  docente_id?: number;
+  ciclo_id?: number;
+  capacidad?: number;
+  estado?: EstadoUsuario;
+}
+
+export interface IGrupoDetalle extends IGrupo {
+  curso_nombre: string;
+  curso_descripcion?: string | null;
+  docente_nombres: string;
+  docente_apellidos: string;
+  docente_codigo: string;
+  ciclo_nombre: string;
+  ciclo_fecha_inicio: string | Date;
+  ciclo_fecha_fin: string | Date;
+  matriculados_count: number;
+  vacantes_disponibles: number;
+  horarios?: IHorario[];
+}
+
+export interface FiltrosGrupoDTO {
+  ciclo_id?: number;
+  curso_id?: number;
+  docente_id?: number;
+  soloActivos?: boolean;
+}
+
+// ==========================================
+// ESTUDIANTES (DTOs TRANSACCIONALES)
+// ==========================================
+export interface CreateEstudianteDTO {
+  nombres: string;
+  apellidos: string;
+  dni: string;
+  fecha_nacimiento: string;
+  telefono?: string;
+  correo?: string;
+  direccion?: string;
+  nombre_usuario?: string;
+  password?: string;
+}
+
+export interface UpdateEstudianteDTO {
+  nombres?: string;
+  apellidos?: string;
+  dni?: string;
+  fecha_nacimiento?: string;
+  telefono?: string;
+  correo?: string;
+  direccion?: string;
+  estado?: EstadoUsuario;
+}
+
+export interface EstudianteConUsuario extends IEstudiante {
+  nombre_usuario: string;
+  estado_usuario: EstadoUsuario;
+}
+
+// ==========================================
+// MATRÍCULAS (ENTIDADES Y DTOs)
+// ==========================================
+export interface IMatricula {
+  id: number;
+  codigo_matricula: string;
+  estudiante_id: number;
+  grupo_id: number;
+  ciclo_id: number;
+  estado: EstadoMatricula;
+  fecha_registro: string | Date;
+}
+
+export interface CreateMatriculaDTO {
+  estudiante_id: number;
+  grupo_id: number;
+  ciclo_id: number;
+  pago_inicial?: {
+    concepto: string;
+    monto: number;
+    metodo_pago: MetodoPago;
+  };
+}
+
+export interface CambiarEstadoMatriculaDTO {
+  estado: EstadoMatricula;
+}
+
+export interface IMatriculaDetalle extends IMatricula {
+  estudiante_nombres: string;
+  estudiante_apellidos: string;
+  estudiante_dni: string;
+  estudiante_codigo: string;
+  estudiante_correo?: string | null;
+  grupo_nombre: string;
+  curso_id: number;
+  curso_nombre: string;
+  ciclo_nombre: string;
+  docente_id: number;
+  docente_nombres: string;
+  docente_apellidos: string;
+}
+
+// ==========================================
+// PAGOS (ENTIDADES Y DTOs)
+// ==========================================
+export interface IPago {
+  id: number;
+  matricula_id: number;
+  concepto: string;
+  monto: number;
+  fecha: string | Date;
+  metodo_pago: MetodoPago;
+  estado: EstadoPago;
+}
+
+export interface CreatePagoDTO {
+  matricula_id: number;
+  concepto: string;
+  monto: number;
+  metodo_pago: MetodoPago;
+}
+
+export interface IPagoDetalle extends IPago {
+  codigo_matricula: string;
+  estudiante_id: number;
+  estudiante_nombres: string;
+  estudiante_apellidos: string;
+  estudiante_dni: string;
+  curso_nombre: string;
+  grupo_nombre: string;
+  ciclo_nombre: string;
+}
+
+// ==========================================
+// RESPUESTA ESTÁNDAR DE LA API
+// ==========================================
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  message?: string;
+  data?: T;
+  error?: string;
+}
+
+// ==========================================
+// EXTENSIÓN DE EXPRESS REQUEST CON SESIÓN
+// ==========================================
+export interface AuthenticatedRequest extends Request {
+  user?: JWTPayload;
+}

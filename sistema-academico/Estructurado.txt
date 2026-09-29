@@ -1,0 +1,124 @@
+frontend/
+│
+├── src/
+│   │
+│   ├── app/
+│   │   ├── page.tsx              ← LOGIN
+│   │   ├── layout.tsx
+│   │   │
+│   │   ├── admin/
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── usuarios/
+│   │   │   ├── cursos/
+│   │   │   ├── ciclos/
+│   │   │   ├── grupos/
+│   │   │   └── horarios/
+│   │   │
+│   │   ├── administrativo/
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── estudiantes/
+│   │   │   ├── matriculas/
+│   │   │   └── pagos/
+│   │   │
+│   │   ├── docente/
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── asistencia/
+│   │   │   └── evaluaciones/
+│   │   │
+│   │   └── estudiante/
+│   │       ├── layout.tsx
+│   │       ├── page.tsx
+│   │       ├── cursos/
+│   │       ├── asistencia/
+│   │       ├── notas/
+│   │       ├── matricula/
+│   │       ├── pagos/
+│   │       └── horario/
+│   │
+│   ├── components/
+│   │   ├── Button/
+│   │   ├── Input/
+│   │   ├── Modal/
+│   │   ├── Table/
+│   │   ├── Sidebar/
+│   │   └── Navbar/
+│   │
+│   ├── services/
+│   │   ├── api.ts
+│   │   ├── estudiante.service.ts
+│   │   ├── matricula.service.ts
+│   │   └── ...
+│   │
+│   ├── hooks/
+│   │   └── ...
+│   │
+│   ├── types/
+│   │   └── ...
+│   │
+│   └── themes/
+│       └── ...
+│
+└── package.json
+backend/
+│
+├── package.json
+├── tsconfig.json
+├── .env
+├── .gitignore
+│
+└── src/
+    │
+    ├── config/
+    │   └── database.ts
+    │
+    ├── controllers/
+    │   ├── auth.controller.ts
+    │   ├── usuario.controller.ts
+    │   ├── estudiante.controller.ts
+    │   ├── docente.controller.ts
+    │   ├── academico.controller.ts
+    │   ├── matricula.controller.ts
+    │   ├── pago.controller.ts
+    │   └── evaluacion.controller.ts
+    │
+    ├── services/
+    │   ├── auth.service.ts
+    │   ├── usuario.service.ts
+    │   ├── estudiante.service.ts
+    │   ├── docente.service.ts
+    │   ├── academico.service.ts
+    │   ├── matricula.service.ts
+    │   ├── pago.service.ts
+    │   └── evaluacion.service.ts
+    │
+    ├── repositories/
+    │   ├── usuario.repository.ts
+    │   ├── estudiante.repository.ts
+    │   ├── docente.repository.ts
+    │   ├── academico.repository.ts
+    │   ├── matricula.repository.ts
+    │   ├── pago.repository.ts
+    │   └── evaluacion.repository.ts
+    │
+    ├── routes/
+    │   ├── auth.routes.ts
+    │   ├── usuario.routes.ts
+    │   ├── estudiante.routes.ts
+    │   ├── docente.routes.ts
+    │   ├── academico.routes.ts
+    │   ├── matricula.routes.ts
+    │   ├── pago.routes.ts
+    │   └── evaluacion.routes.ts
+    │
+    ├── middlewares/
+    │   ├── not-found.middleware.ts
+    │   └── error.middleware.ts
+    │
+    ├── types/
+    │   └── index.ts
+    │
+    ├── app.ts
+    └── server.ts
