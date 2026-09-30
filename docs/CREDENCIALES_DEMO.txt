@@ -1,0 +1,33 @@
+CREDENCIALES DE DEMOSTRACIÓN — SA-studios
+====================================
+
+Estas cuentas se insertan al importar docs/database.sql.
+El inicio de sesión valida las contraseñas contra la API y sus hashes bcrypt.
+
+Administrador del sistema
+  Usuario: admin
+  Contraseña: Admin2026*
+
+Personal administrativo
+  Usuario: secretaria
+  Contraseña: Administrativo2026*
+
+Docente
+  Usuario: docente
+  Contraseña: Docente2026*
+
+Estudiante
+  Usuario: estudiante
+  Contraseña: Estudiante2026*
+
+Estudiantes de demostración adicionales
+  Usuario: diego
+  Contraseña: Estudiante2026*
+  Usuario: valeria
+  Contraseña: Estudiante2026*
+
+API local: http://localhost:4000/api
+Frontend Next.js local: http://localhost:8443
+
+Las cuentas se insertan al importar docs/database.sql. Cambie estas claves
+antes de usar el sistema con información real.
