@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 export const metadata: Metadata = {
   title: "SA-studios | Sistema académico",
   description: "Gestión académica y administrativa",
-  icons: { icon: "/sa-studios-logo.png" },
+  icons: { icon: "/sa-studios-logo.svg" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

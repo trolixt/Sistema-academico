@@ -122,9 +122,14 @@ export class MatriculaService {
       throw error;
     }
 
-    // 7. Validar pago inicial si viene en el DTO
-    if (dto.pago_inicial) {
-      const { concepto, monto, metodo_pago } = dto.pago_inicial;
+    // 7. La matrícula requiere el pago inicial y la mensualidad del ciclo
+    if (!dto.pago_inicial) {
+      const error: any = new Error('Registra el monto de matrícula y mensualidad para continuar');
+      error.statusCode = 400;
+      throw error;
+    }
+    {
+      const { concepto, monto, monto_mensualidad } = dto.pago_inicial;
       if (!concepto?.trim()) {
         const error: any = new Error('El concepto del pago inicial es obligatorio');
         error.statusCode = 400;
@@ -135,8 +140,8 @@ export class MatriculaService {
         error.statusCode = 400;
         throw error;
       }
-      if (!['EFECTIVO', 'TRANSFERENCIA', 'TARJETA'].includes(metodo_pago)) {
-        const error: any = new Error('El método de pago es inválido. Use: EFECTIVO, TRANSFERENCIA o TARJETA');
+      if (!monto_mensualidad || monto_mensualidad <= 0) {
+        const error: any = new Error('El monto mensual debe ser mayor a 0');
         error.statusCode = 400;
         throw error;
       }
@@ -153,11 +158,11 @@ export class MatriculaService {
         grupo_id: dto.grupo_id,
         ciclo_id: dto.ciclo_id
       },
-      dto.pago_inicial ? {
+      {
         concepto: dto.pago_inicial.concepto.trim(),
         monto: dto.pago_inicial.monto,
-        metodo_pago: dto.pago_inicial.metodo_pago
-      } : undefined
+        monto_mensualidad: dto.pago_inicial.monto_mensualidad
+      }
     );
 
     return (await this.repo.findById(nuevaId))!;
@@ -179,6 +184,12 @@ export class MatriculaService {
 
     if (matricula.estado === dto.estado) {
       const error: any = new Error(`La matrícula ya se encuentra en estado "${dto.estado}"`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (matricula.estado === 'PENDIENTE_PAGO' && dto.estado === 'ACTIVA') {
+      const error: any = new Error('Confirma el pago inicial desde Pagos para activar la matrícula');
       error.statusCode = 400;
       throw error;
     }

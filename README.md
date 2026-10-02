@@ -26,7 +26,10 @@ docs/
   database.sql                  Esquema y datos iniciales para MySQL
   CREDENCIALES_DEMO.txt         Cuentas locales de demostración
   *.md                          Requisitos y documentación del sistema
+  referencias/figma/            Referencias visuales únicamente; nunca código ejecutable
 ```
+
+Los diseños de Figma son guía visual. No se ejecutan ni se importan desde la aplicación; las pantallas funcionales viven en `frontend/src/app` y `frontend/src/features`. La configuración de Figma Make se retiró del frontend porque correspondía a un flujo Vite/Figma separado de este proyecto Next.js.
 
 ## Ejecución local
 

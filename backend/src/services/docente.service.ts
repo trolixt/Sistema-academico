@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import { docenteRepository, DocenteRepository, DocenteConUsuario, CreateDocenteDTO, UpdateDocenteDTO } from '../repositories/docente.repository';
+import { validarDni, validarTelefono } from '../utils/validaciones-personales';
 
 export class DocenteService {
   private repo: DocenteRepository;
@@ -41,6 +42,10 @@ export class DocenteService {
       error.statusCode = 400;
       throw error;
     }
+    validarDni(dto.dni);
+    validarTelefono(dto.telefono);
+    dto.dni = dto.dni.trim();
+    dto.telefono = dto.telefono?.trim();
 
     // Verificar DNI único
     const existeDni = await this.repo.findByDni(dto.dni.trim());
@@ -79,6 +84,10 @@ export class DocenteService {
 
   async updateDocente(id: number, dto: UpdateDocenteDTO): Promise<DocenteConUsuario> {
     const docenteActual = await this.getDocenteById(id);
+    validarDni(dto.dni);
+    validarTelefono(dto.telefono);
+    if (dto.dni !== undefined) dto.dni = dto.dni.trim();
+    if (dto.telefono !== undefined) dto.telefono = dto.telefono.trim();
 
     // Validar DNI único si se está cambiando
     if (dto.dni && dto.dni.trim() !== docenteActual.dni) {

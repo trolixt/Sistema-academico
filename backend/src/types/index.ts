@@ -6,11 +6,12 @@ import { Request } from 'express';
 export type RolUsuario = 'ADMINISTRADOR' | 'ADMINISTRATIVO' | 'DOCENTE' | 'ESTUDIANTE';
 export type EstadoUsuario = 'ACTIVO' | 'INACTIVO';
 export type DiaSemana = 'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES' | 'SABADO' | 'DOMINGO';
-export type EstadoMatricula = 'ACTIVA' | 'CANCELADA' | 'RETIRADA';
-export type MetodoPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
-export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'ANULADO';
+export type EstadoMatricula = 'PENDIENTE_PAGO' | 'ACTIVA' | 'CANCELADA' | 'RETIRADA';
+export type MetodoPago = 'EFECTIVO' | 'YAPE' | 'TRANSFERENCIA';
+export type EstadoPago = 'PENDIENTE' | 'PAGADO' | 'VENCIDO' | 'ANULADO';
+export type TipoPago = 'MATRICULA' | 'MENSUALIDAD' | 'OTRO';
 export type EstadoSesionAsistencia = 'ABIERTA' | 'CERRADA';
-export type EstadoAsistencia = 'PRESENTE' | 'AUSENTE' | 'TARDANZA';
+export type EstadoAsistencia = 'PRESENTE' | 'AUSENTE' | 'TARDANZA' | 'JUSTIFICADO';
 export type EstadoEvaluacion = 'BORRADOR' | 'PUBLICADA';
 
 // ==========================================
@@ -270,10 +271,10 @@ export interface CreateMatriculaDTO {
   estudiante_id: number;
   grupo_id: number;
   ciclo_id: number;
-  pago_inicial?: {
+  pago_inicial: {
     concepto: string;
     monto: number;
-    metodo_pago: MetodoPago;
+    monto_mensualidad: number;
   };
 }
 
@@ -303,17 +304,23 @@ export interface IPago {
   id: number;
   matricula_id: number;
   concepto: string;
+  tipo_pago: TipoPago;
+  periodo: string | null;
+  fecha_vencimiento: string | Date | null;
+  codigo_pago: string | null;
   monto: number;
-  fecha: string | Date;
-  metodo_pago: MetodoPago;
+  monto_recibido: number | null;
+  fecha: string | Date | null;
+  metodo_pago: MetodoPago | null;
   estado: EstadoPago;
+  referencia_operacion: string | null;
 }
 
 export interface CreatePagoDTO {
-  matricula_id: number;
-  concepto: string;
-  monto: number;
+  codigo_pago: string;
+  monto_recibido: number;
   metodo_pago: MetodoPago;
+  referencia_operacion?: string;
 }
 
 export interface IPagoDetalle extends IPago {

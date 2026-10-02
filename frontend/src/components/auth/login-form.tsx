@@ -3,8 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
-import Image from "next/image";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { AcademyWordmark } from "@/components/brand/academy-wordmark";
 
 export function LoginForm() {
   const router = useRouter();
@@ -29,7 +29,7 @@ export function LoginForm() {
 
   return <main className="login-layout">
     <section className="login-brand-panel">
-      <div className="brand-lockup"><Image src="/sa-studios-logo.png" alt="" width={56} height={44} className="brand-logo" priority /><span>SA-studios</span></div>
+      <div className="brand-lockup"><AcademyWordmark width={230} height={54} /></div>
       <div className="login-brand-copy"><span className="eyebrow light">PLATAFORMA ACADÉMICA</span><h1>Tu academia,<br />bien organizada.</h1><p>Un espacio único para gestionar el trabajo académico y administrativo.</p></div>
       <small className="login-footer">Sistema de gestión académica</small>
     </section>

@@ -169,19 +169,20 @@ export class EvaluacionRepository {
     return rows as IDetalleNota[];
   }
 
-  async findNotasByEstudiante(estudianteId: number): Promise<Array<IDetalleNota & { fecha: string; nombre_evaluacion: string; curso_nombre: string; grupo_nombre: string }>> {
+  async findNotasByEstudiante(estudianteId: number): Promise<Array<IDetalleNota & { fecha: string; nombre_evaluacion: string; curso_nombre: string; grupo_nombre: string; ciclo_nombre: string }>> {
     const [rows] = await pool.execute<RowDataPacket[]>(`
       SELECT dn.id, dn.evaluacion_id, dn.estudiante_id, dn.valor_nota,
-        ev.fecha, ev.nombre_evaluacion, c.nombre AS curso_nombre, g.nombre AS grupo_nombre
+        ev.fecha, ev.nombre_evaluacion, c.nombre AS curso_nombre, g.nombre AS grupo_nombre, ca.nombre AS ciclo_nombre
       FROM DetalleNota dn
       INNER JOIN EvaluacionNotas ev ON ev.id = dn.evaluacion_id AND ev.estado = 'PUBLICADA'
       INNER JOIN Grupo g ON g.id = ev.grupo_id
       INNER JOIN Curso c ON c.id = g.curso_id
+      INNER JOIN CicloAcademico ca ON ca.id = g.ciclo_id
       INNER JOIN Matricula m ON m.estudiante_id = dn.estudiante_id AND m.grupo_id = g.id AND m.estado = 'ACTIVA'
       WHERE dn.estudiante_id = ?
       ORDER BY ev.fecha DESC, c.nombre ASC
     `, [estudianteId]);
-    return rows as Array<IDetalleNota & { fecha: string; nombre_evaluacion: string; curso_nombre: string; grupo_nombre: string }>;
+    return rows as Array<IDetalleNota & { fecha: string; nombre_evaluacion: string; curso_nombre: string; grupo_nombre: string; ciclo_nombre: string }>;
   }
 
   /**

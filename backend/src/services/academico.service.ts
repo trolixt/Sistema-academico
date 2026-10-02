@@ -121,6 +121,11 @@ export class AcademicoService {
       error.statusCode = 400;
       throw error;
     }
+    if (monthDistance(fechaInicio, fechaFin) !== 5) {
+      const error: any = new Error('El ciclo académico debe abarcar exactamente seis meses calendario');
+      error.statusCode = 400;
+      throw error;
+    }
 
     const insertId = await this.repo.createCiclo(dto);
     return (await this.repo.findCicloById(insertId))!;
@@ -137,6 +142,11 @@ export class AcademicoService {
 
     if (fechaInicio > fechaFin) {
       const error: any = new Error('La fecha de inicio no puede ser posterior a la fecha de fin');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (monthDistance(fechaInicio, fechaFin) !== 5) {
+      const error: any = new Error('El ciclo académico debe abarcar exactamente seis meses calendario');
       error.statusCode = 400;
       throw error;
     }
@@ -369,6 +379,11 @@ export class AcademicoService {
     await this.repo.deleteHorario(id);
     return { message: `Horario con ID ${id} eliminado correctamente` };
   }
+}
+
+function monthDistance(start: Date, end: Date): number {
+  return (end.getUTCFullYear() - start.getUTCFullYear()) * 12
+    + end.getUTCMonth() - start.getUTCMonth();
 }
 
 export const academicoService = new AcademicoService();

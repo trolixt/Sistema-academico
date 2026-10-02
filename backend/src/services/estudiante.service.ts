@@ -5,6 +5,7 @@ import {
   CreateEstudianteDTO,
   UpdateEstudianteDTO
 } from '../types';
+import { validarDni, validarTelefono } from '../utils/validaciones-personales';
 
 export class EstudianteService {
   private repo: EstudianteRepository;
@@ -59,6 +60,10 @@ export class EstudianteService {
       error.statusCode = 400;
       throw error;
     }
+    validarDni(dto.dni);
+    validarTelefono(dto.telefono);
+    dto.dni = dto.dni.trim();
+    dto.telefono = dto.telefono?.trim();
     if (!dto.fecha_nacimiento) {
       const error: any = new Error('La fecha de nacimiento es obligatoria');
       error.statusCode = 400;
@@ -118,6 +123,10 @@ export class EstudianteService {
 
   async updateEstudiante(id: number, dto: UpdateEstudianteDTO): Promise<EstudianteConUsuario> {
     const estudianteActual = await this.getEstudianteById(id);
+    validarDni(dto.dni);
+    validarTelefono(dto.telefono);
+    if (dto.dni !== undefined) dto.dni = dto.dni.trim();
+    if (dto.telefono !== undefined) dto.telefono = dto.telefono.trim();
 
     // Validar que el nuevo DNI no esté en uso por otro estudiante
     if (dto.dni && dto.dni.trim() !== estudianteActual.dni) {

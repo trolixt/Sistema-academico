@@ -165,10 +165,12 @@ CREATE TABLE IF NOT EXISTS Matricula (
     grupo_id INT NOT NULL,
     ciclo_id INT NOT NULL,
     estado ENUM(
+        'PENDIENTE_PAGO',
         'ACTIVA',
         'CANCELADA',
         'RETIRADA'
-    ) DEFAULT 'ACTIVA',
+    ) DEFAULT 'PENDIENTE_PAGO',
+    monto_mensualidad DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (estudiante_id) REFERENCES Estudiante(id),
     FOREIGN KEY (grupo_id) REFERENCES Grupo(id),
@@ -181,22 +183,66 @@ CREATE TABLE IF NOT EXISTS Matricula (
 -- --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS Pago (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo_pago VARCHAR(20) NULL UNIQUE,
     matricula_id INT NOT NULL,
     concepto VARCHAR(150) NOT NULL,
+    tipo_pago ENUM('MATRICULA', 'MENSUALIDAD', 'OTRO') NOT NULL DEFAULT 'OTRO',
+    periodo CHAR(7) NULL,
+    fecha_vencimiento DATE NULL,
     monto DECIMAL(10,2) NOT NULL,
-    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    monto_recibido DECIMAL(10,2) NULL,
+    fecha DATETIME NULL DEFAULT NULL,
     metodo_pago ENUM(
         'EFECTIVO',
-        'TRANSFERENCIA',
-        'TARJETA'
-    ) NOT NULL,
+        'YAPE',
+        'TRANSFERENCIA'
+    ) NULL,
+    referencia_operacion VARCHAR(100) NULL,
     estado ENUM(
         'PENDIENTE',
         'PAGADO',
         'ANULADO'
     ) DEFAULT 'PENDIENTE',
-    FOREIGN KEY (matricula_id) REFERENCES Matricula(id)
+    FOREIGN KEY (matricula_id) REFERENCES Matricula(id),
+    UNIQUE KEY uq_pago_periodo_matricula (matricula_id, tipo_pago, periodo)
 ) ENGINE=InnoDB;
+
+-- Actualización idempotente para instalaciones que ya tenían creada la tabla Pago.
+-- Se mantiene dentro de este archivo para conservar una sola fuente de esquema.
+SET @tiene_codigo_pago = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Pago' AND COLUMN_NAME = 'codigo_pago'
+);
+SET @ddl_codigo_pago = IF(@tiene_codigo_pago = 0,
+    'ALTER TABLE Pago ADD COLUMN codigo_pago VARCHAR(20) NULL UNIQUE AFTER id', 'SELECT 1');
+PREPARE stmt_codigo_pago FROM @ddl_codigo_pago;
+EXECUTE stmt_codigo_pago;
+DEALLOCATE PREPARE stmt_codigo_pago;
+
+SET @tiene_monto_recibido = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Pago' AND COLUMN_NAME = 'monto_recibido'
+);
+SET @ddl_monto_recibido = IF(@tiene_monto_recibido = 0,
+    'ALTER TABLE Pago ADD COLUMN monto_recibido DECIMAL(10,2) NULL AFTER monto', 'SELECT 1');
+PREPARE stmt_monto_recibido FROM @ddl_monto_recibido;
+EXECUTE stmt_monto_recibido;
+DEALLOCATE PREPARE stmt_monto_recibido;
+
+SET @tipo_metodo_pago = (
+    SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Pago' AND COLUMN_NAME = 'metodo_pago'
+);
+SET @ddl_metodo_pago = IF(@tipo_metodo_pago NOT LIKE '%YAPE%',
+    'ALTER TABLE Pago MODIFY metodo_pago ENUM(''EFECTIVO'',''YAPE'',''TRANSFERENCIA'',''TARJETA'') NULL', 'SELECT 1');
+PREPARE stmt_metodo_pago FROM @ddl_metodo_pago;
+EXECUTE stmt_metodo_pago;
+DEALLOCATE PREPARE stmt_metodo_pago;
+
+-- El código se deriva del identificador persistido; no representa confirmación del abono.
+UPDATE Pago
+SET codigo_pago = CONCAT('SA-', LPAD(id, 10, '0'))
+WHERE codigo_pago IS NULL;
 
 -- --------------------------------------------------------
 -- 12. TABLA: SesionAsistencia
@@ -223,7 +269,8 @@ CREATE TABLE IF NOT EXISTS DetalleAsistencia (
     estado_asistencia ENUM(
         'PRESENTE',
         'AUSENTE',
-        'TARDANZA'
+        'TARDANZA',
+        'JUSTIFICADO'
     ) NOT NULL,
     FOREIGN KEY (sesion_asistencia_id) REFERENCES SesionAsistencia(id) ON DELETE CASCADE,
     FOREIGN KEY (estudiante_id) REFERENCES Estudiante(id),
@@ -302,11 +349,11 @@ INSERT IGNORE INTO Matricula (id, codigo_matricula, estudiante_id, grupo_id, cic
 (2, 'MAT-2026-0002', 1, 2, 1, 'ACTIVA', '2026-09-01 09:10:00'),
 (3, 'MAT-2026-0003', 2, 1, 1, 'ACTIVA', '2026-09-02 10:00:00'),
 (4, 'MAT-2026-0004', 3, 3, 1, 'ACTIVA', '2026-09-03 11:00:00');
-INSERT IGNORE INTO Pago (id, matricula_id, concepto, monto, fecha, metodo_pago, estado) VALUES
-(1, 1, 'Matrícula', 150.00, '2026-09-01 09:05:00', 'EFECTIVO', 'PAGADO'),
-(2, 1, 'Mensualidad septiembre', 180.00, '2026-09-05 12:00:00', 'TRANSFERENCIA', 'PAGADO'),
-(3, 2, 'Mensualidad septiembre', 180.00, '2026-09-10 00:00:00', 'EFECTIVO', 'PENDIENTE'),
-(4, 3, 'Matrícula', 150.00, '2026-09-02 10:05:00', 'TARJETA', 'PAGADO');
+INSERT IGNORE INTO Pago (id, codigo_pago, matricula_id, concepto, tipo_pago, periodo, monto, monto_recibido, fecha, metodo_pago, referencia_operacion, estado) VALUES
+(1, 'SA-0000000001', 1, 'Matrícula', 'MATRICULA', NULL, 150.00, 150.00, '2026-09-01 09:05:00', 'EFECTIVO', NULL, 'PAGADO'),
+(2, 'SA-0000000002', 1, 'Mensualidad septiembre', 'MENSUALIDAD', '2026-09', 180.00, 180.00, '2026-09-05 12:00:00', 'TRANSFERENCIA', 'DEMO-TRANSFERENCIA-0002', 'PAGADO'),
+(3, 'SA-0000000003', 2, 'Mensualidad septiembre', 'MENSUALIDAD', '2026-09', 180.00, NULL, NULL, NULL, NULL, 'PENDIENTE'),
+(4, 'SA-0000000004', 3, 'Matrícula', 'MATRICULA', NULL, 150.00, 150.00, '2026-09-02 10:05:00', 'YAPE', 'DEMO-YAPE-0004', 'PAGADO');
 INSERT IGNORE INTO SesionAsistencia (id, grupo_id, fecha, estado) VALUES
 (1, 1, '2026-09-07', 'CERRADA'), (2, 1, '2026-09-14', 'CERRADA'),
 (3, 2, '2026-09-09', 'CERRADA');

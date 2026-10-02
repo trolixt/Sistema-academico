@@ -6,8 +6,6 @@ import {
   CreateMatriculaDTO,
   CambiarEstadoMatriculaDTO,
   EstadoMatricula,
-  CreatePagoDTO,
-  MetodoPago
 } from '../types';
 
 export class MatriculaRepository {
@@ -91,7 +89,7 @@ export class MatriculaRepository {
    */
   async countMatriculasActivasByGrupo(grupoId: number): Promise<number> {
     const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT COUNT(*) AS total FROM Matricula WHERE grupo_id = ? AND estado = 'ACTIVA'`,
+      `SELECT COUNT(*) AS total FROM Matricula WHERE grupo_id = ? AND estado IN ('ACTIVA', 'PENDIENTE_PAGO')`,
       [grupoId]
     );
     return Number(rows[0]?.total || 0);
@@ -124,10 +122,10 @@ export class MatriculaRepository {
       grupo_id: number;
       ciclo_id: number;
     },
-    pagoInicial?: {
+    pagoInicial: {
       concepto: string;
       monto: number;
-      metodo_pago: MetodoPago;
+      monto_mensualidad: number;
     }
   ): Promise<number> {
     const conn: PoolConnection = await pool.getConnection();
@@ -135,19 +133,18 @@ export class MatriculaRepository {
       await conn.beginTransaction();
 
       const [result] = await conn.execute<ResultSetHeader>(
-        `INSERT INTO Matricula (codigo_matricula, estudiante_id, grupo_id, ciclo_id, estado)
-         VALUES (?, ?, ?, ?, 'ACTIVA')`,
-        [data.codigo_matricula, data.estudiante_id, data.grupo_id, data.ciclo_id]
+        `INSERT INTO Matricula (codigo_matricula, estudiante_id, grupo_id, ciclo_id, estado, monto_mensualidad)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [data.codigo_matricula, data.estudiante_id, data.grupo_id, data.ciclo_id, 'PENDIENTE_PAGO', pagoInicial.monto_mensualidad]
       );
       const matriculaId = result.insertId;
 
-      if (pagoInicial) {
-        await conn.execute(
-          `INSERT INTO Pago (matricula_id, concepto, monto, metodo_pago, estado)
-           VALUES (?, ?, ?, ?, 'PAGADO')`,
-          [matriculaId, pagoInicial.concepto, pagoInicial.monto, pagoInicial.metodo_pago]
-        );
-      }
+      const [paymentResult] = await conn.execute<ResultSetHeader>(
+        `INSERT INTO Pago (matricula_id, concepto, tipo_pago, monto, metodo_pago, estado, fecha)
+         VALUES (?, ?, 'MATRICULA', ?, NULL, 'PENDIENTE', NULL)`,
+        [matriculaId, pagoInicial.concepto, pagoInicial.monto]);
+      await conn.execute('UPDATE Pago SET codigo_pago = ? WHERE id = ?',
+        [`SA-${String(paymentResult.insertId).padStart(10, '0')}`, paymentResult.insertId]);
 
       await conn.commit();
       return matriculaId;

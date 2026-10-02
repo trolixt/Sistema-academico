@@ -27,7 +27,7 @@
 * **Módulo de Estudiantes y Cuentas:** Registro integral de estudiante + creación transaccional simultánea de su registro en `Usuario`, generación correlativa de código de estudiante (`EST-XXXX`), validación de duplicidad de DNI y username, actualización de datos de contacto y desactivación lógica.
 * **Módulo de Matrículas:** Validación en tiempo real del aforo del grupo (`capacidad - matriculas_activas > 0`), validación de duplicidad por `UNIQUE(estudiante_id, grupo_id, ciclo_id)`, generación de código de matrícula (`MAT-YYYY-XXXX`), registro simultáneo opcional del pago inicial y cambio de estado (`ACTIVA`, `CANCELADA`, `RETIRADA`).
 * **Módulo de Oferta Académica (Cursos, Ciclos, Grupos, Horarios):** CRUD de cursos y ciclos, apertura de grupos con aforo configurable, validación de solapamiento de horarios por docente y por aula.
-* **Módulo de Pagos y Caja:** Registro de transacciones con métodos de pago (`EFECTIVO`, `TRANSFERENCIA`, `TARJETA`), consulta de cuentas por cobrar e inmutabilidad financiera (anulación con cambio de estado, sin eliminación física).
+* **Módulo de Pagos y Caja:** Códigos por cuota y registro en secretaría de cobros recibidos por efectivo, Yape o transferencia, con consulta de cuentas por cobrar y anulación sin eliminación física.
 * **Módulo de Asistencia:** Apertura de sesiones por fecha (`UNIQUE(grupo_id, fecha)`), guardado borrador, cierre definitivo con bloqueo de edición y consulta de porcentaje de asistencias.
 * **Módulo de Evaluaciones y Calificaciones:** Ciclo de vida de evaluaciones (`BORRADOR` -> `PUBLICADA`), ingreso de notas en escala vigesimal (0.00 - 20.00), cálculo de promedios ponderados/simples y reapertura administrativa.
 

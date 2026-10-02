@@ -73,12 +73,19 @@ export class PagoController {
       const nuevoPago = await this.service.createPago(dto);
       res.status(201).json({
         success: true,
-        message: 'Pago registrado correctamente',
+        message: 'Cobro recibido y aplicado correctamente',
         data: nuevoPago
       });
     } catch (error) {
       next(error);
     }
+  };
+
+  getByCodigo = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const pago = await this.service.getPagoByCodigo(String(req.params.codigo));
+      res.status(200).json({ success: true, data: pago });
+    } catch (error) { next(error); }
   };
 
   /**

@@ -28,6 +28,21 @@ export class PagoService {
     return pago;
   }
 
+  async getPagoByCodigo(codigo: string): Promise<IPagoDetalle> {
+    const pago = await this.repo.findByCode(codigo.trim().toUpperCase());
+    if (!pago) {
+      const error: any = new Error('No encontramos una cuota con ese código');
+      error.statusCode = 404;
+      throw error;
+    }
+    if (pago.estado !== 'PENDIENTE' && pago.estado !== 'VENCIDO') {
+      const error: any = new Error('Ese código ya no corresponde a una cuota pendiente');
+      error.statusCode = 409;
+      throw error;
+    }
+    return pago;
+  }
+
   async getPagosByMatricula(matriculaId: number): Promise<IPagoDetalle[]> {
     // Verificar que la matrícula exista
     const matricula = await this.matriculaRepo.findById(matriculaId);
@@ -40,43 +55,38 @@ export class PagoService {
   }
 
   async createPago(dto: CreatePagoDTO): Promise<IPagoDetalle> {
-    // Validaciones
-    if (!dto.matricula_id) {
-      const error: any = new Error('El matricula_id es obligatorio');
+    if (!dto.codigo_pago?.trim()) {
+      const error: any = new Error('Ingresa el código de pago');
       error.statusCode = 400;
       throw error;
     }
-    if (!dto.concepto?.trim()) {
-      const error: any = new Error('El concepto del pago es obligatorio');
+    if (!Number.isFinite(dto.monto_recibido) || dto.monto_recibido <= 0) {
+      const error: any = new Error('El importe recibido debe ser mayor que cero');
       error.statusCode = 400;
       throw error;
     }
-    if (!dto.monto || dto.monto <= 0) {
-      const error: any = new Error('El monto debe ser un valor mayor a 0');
+    if (!['EFECTIVO', 'YAPE', 'TRANSFERENCIA'].includes(dto.metodo_pago)) {
+      const error: any = new Error('Selecciona efectivo, Yape o transferencia bancaria');
       error.statusCode = 400;
       throw error;
     }
-    if (!['EFECTIVO', 'TRANSFERENCIA', 'TARJETA'].includes(dto.metodo_pago)) {
-      const error: any = new Error('Método de pago inválido. Use: EFECTIVO, TRANSFERENCIA o TARJETA');
+    if (dto.metodo_pago !== 'EFECTIVO' && !dto.referencia_operacion?.trim()) {
+      const error: any = new Error('Ingresa el número de operación de Yape o del banco, después de comprobar el abono recibido');
       error.statusCode = 400;
       throw error;
     }
-
-    // Verificar que la matrícula exista y esté activa
-    const matricula = await this.matriculaRepo.findById(dto.matricula_id);
-    if (!matricula) {
-      const error: any = new Error(`La matrícula con ID ${dto.matricula_id} no existe`);
-      error.statusCode = 404;
-      throw error;
-    }
-    if (matricula.estado !== 'ACTIVA') {
-      const error: any = new Error('No se puede registrar un pago para una matrícula cancelada o retirada');
+    const charge = await this.getPagoByCodigo(dto.codigo_pago);
+    if (Number(charge.monto) !== Number(dto.monto_recibido)) {
+      const error: any = new Error(`El importe recibido debe ser exactamente ${Number(charge.monto).toFixed(2)}`);
       error.statusCode = 400;
       throw error;
     }
-
-    const nuevoPagoId = await this.repo.create(dto);
-    return (await this.repo.findById(nuevoPagoId))!;
+    if (!await this.repo.registrar(dto)) {
+      const error: any = new Error('No se registró el cobro. Revisa que la cuota siga pendiente, el importe coincida y la matrícula esté vigente.');
+      error.statusCode = 409;
+      throw error;
+    }
+    return (await this.repo.findByCode(dto.codigo_pago.trim().toUpperCase()))!;
   }
 
   async anularPago(id: number): Promise<IPagoDetalle> {

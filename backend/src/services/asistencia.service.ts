@@ -33,9 +33,18 @@ export class AsistenciaService {
     if (session.estado !== 'ABIERTA') { const error: any = new Error('La sesión está cerrada y no admite cambios'); error.statusCode = 400; throw error; }
     if (docenteId && Number(session.docente_id) !== docenteId) { const error: any = new Error('La sesión no pertenece a un grupo asignado a este docente'); error.statusCode = 403; throw error; }
     if (!Array.isArray(details) || details.length === 0) { const error: any = new Error('Se requiere al menos un registro de asistencia'); error.statusCode = 400; throw error; }
-    const valid = new Set<EstadoAsistencia>(['PRESENTE', 'AUSENTE', 'TARDANZA']);
+    const valid = new Set<EstadoAsistencia>(['PRESENTE', 'AUSENTE', 'TARDANZA', 'JUSTIFICADO']);
     if (details.some((detail) => !Number.isInteger(detail.estudiante_id) || !valid.has(detail.estado_asistencia))) {
       const error: any = new Error('Los detalles de asistencia contienen datos inválidos'); error.statusCode = 400; throw error;
+    }
+    const submittedIds = details.map((detail) => detail.estudiante_id);
+    if (new Set(submittedIds).size !== submittedIds.length) {
+      const error: any = new Error('Cada estudiante debe aparecer una sola vez en la sesión'); error.statusCode = 400; throw error;
+    }
+    const enrolled = await asistenciaRepository.findEnrolledStudents(Number(session.grupo_id));
+    const enrolledIds = new Set(enrolled.map((student: any) => Number(student.id)));
+    if (details.length !== enrolledIds.size || submittedIds.some((id) => !enrolledIds.has(id))) {
+      const error: any = new Error('Registra la asistencia de cada estudiante matriculado una sola vez'); error.statusCode = 400; throw error;
     }
     await asistenciaRepository.saveDetails(id, details);
     return this.getSession(id, docenteId);

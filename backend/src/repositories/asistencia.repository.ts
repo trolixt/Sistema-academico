@@ -16,14 +16,17 @@ export class AsistenciaRepository {
     let sql = `SELECT sa.id, sa.grupo_id, sa.fecha, sa.estado,
       g.nombre AS grupo_nombre, c.nombre AS curso_nombre,
       d.nombres AS docente_nombres, d.apellidos AS docente_apellidos,
+      ca.nombre AS ciclo_nombre,
       COUNT(da.id) AS total_estudiantes,
       COALESCE(SUM(da.estado_asistencia = 'PRESENTE'), 0) AS presentes,
       COALESCE(SUM(da.estado_asistencia = 'AUSENTE'), 0) AS ausentes,
-      COALESCE(SUM(da.estado_asistencia = 'TARDANZA'), 0) AS tardanzas
+      COALESCE(SUM(da.estado_asistencia = 'TARDANZA'), 0) AS tardanzas,
+      COALESCE(SUM(da.estado_asistencia = 'JUSTIFICADO'), 0) AS justificados
       FROM SesionAsistencia sa
       INNER JOIN Grupo g ON g.id = sa.grupo_id
       INNER JOIN Curso c ON c.id = g.curso_id
       INNER JOIN Docente d ON d.id = g.docente_id
+      INNER JOIN CicloAcademico ca ON ca.id = g.ciclo_id
       LEFT JOIN DetalleAsistencia da ON da.sesion_asistencia_id = sa.id
       WHERE 1 = 1`;
     const params: number[] = [];
@@ -36,9 +39,12 @@ export class AsistenciaRepository {
 
   async findById(id: number) {
     const [rows] = await pool.execute<RowDataPacket[]>(`SELECT sa.id, sa.grupo_id, sa.fecha, sa.estado,
-      g.nombre AS grupo_nombre, c.nombre AS curso_nombre, g.docente_id
+      g.nombre AS grupo_nombre, c.nombre AS curso_nombre, g.docente_id,
+      d.nombres AS docente_nombres, d.apellidos AS docente_apellidos, ca.nombre AS ciclo_nombre
       FROM SesionAsistencia sa INNER JOIN Grupo g ON g.id = sa.grupo_id
-      INNER JOIN Curso c ON c.id = g.curso_id WHERE sa.id = ?`, [id]);
+      INNER JOIN Curso c ON c.id = g.curso_id
+      INNER JOIN Docente d ON d.id = g.docente_id
+      INNER JOIN CicloAcademico ca ON ca.id = g.ciclo_id WHERE sa.id = ?`, [id]);
     return rows[0] || null;
   }
 
@@ -52,11 +58,14 @@ export class AsistenciaRepository {
 
   async findByStudent(estudianteId: number) {
     const [rows] = await pool.execute<RowDataPacket[]>(`SELECT sa.fecha, da.estado_asistencia,
-      c.nombre AS curso_nombre, g.nombre AS grupo_nombre
+      c.nombre AS curso_nombre, g.nombre AS grupo_nombre, ca.nombre AS ciclo_nombre,
+      d.nombres AS docente_nombres, d.apellidos AS docente_apellidos
       FROM DetalleAsistencia da
       INNER JOIN SesionAsistencia sa ON sa.id = da.sesion_asistencia_id
       INNER JOIN Grupo g ON g.id = sa.grupo_id
       INNER JOIN Curso c ON c.id = g.curso_id
+      INNER JOIN Docente d ON d.id = g.docente_id
+      INNER JOIN CicloAcademico ca ON ca.id = g.ciclo_id
       WHERE da.estudiante_id = ?
       ORDER BY sa.fecha DESC, c.nombre`, [estudianteId]);
     return rows;
