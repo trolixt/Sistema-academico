@@ -15,6 +15,7 @@ import {
   IHorario,
   CreateHorarioDTO,
   UpdateHorarioDTO,
+  IExcepcionHorario,
   DiaSemana
 } from '../types';
 
@@ -220,7 +221,7 @@ export class AcademicoRepository {
         c.nombre AS curso_nombre, c.descripcion AS curso_descripcion,
         canal.nombre AS canal_nombre,
         d.nombres AS docente_nombres, d.apellidos AS docente_apellidos, d.codigo_docente AS docente_codigo,
-        ca.nombre AS ciclo_nombre, ca.fecha_inicio AS ciclo_fecha_inicio, ca.fecha_fin AS ciclo_fecha_fin,
+        ca.nombre AS ciclo_nombre, DATE_FORMAT(ca.fecha_inicio, '%Y-%m-%d') AS ciclo_fecha_inicio, DATE_FORMAT(ca.fecha_fin, '%Y-%m-%d') AS ciclo_fecha_fin,
         CAST(COALESCE(m.matriculados_count, 0) AS SIGNED) AS matriculados_count,
         CAST((g.capacidad - COALESCE(m.matriculados_count, 0)) AS SIGNED) AS vacantes_disponibles
       FROM Grupo g
@@ -279,7 +280,7 @@ export class AcademicoRepository {
         c.nombre AS curso_nombre, c.descripcion AS curso_descripcion,
         canal.nombre AS canal_nombre,
         d.nombres AS docente_nombres, d.apellidos AS docente_apellidos, d.codigo_docente AS docente_codigo,
-        ca.nombre AS ciclo_nombre, ca.fecha_inicio AS ciclo_fecha_inicio, ca.fecha_fin AS ciclo_fecha_fin,
+        ca.nombre AS ciclo_nombre, DATE_FORMAT(ca.fecha_inicio, '%Y-%m-%d') AS ciclo_fecha_inicio, DATE_FORMAT(ca.fecha_fin, '%Y-%m-%d') AS ciclo_fecha_fin,
         CAST(COALESCE(m.matriculados_count, 0) AS SIGNED) AS matriculados_count,
         CAST((g.capacidad - COALESCE(m.matriculados_count, 0)) AS SIGNED) AS vacantes_disponibles
       FROM Grupo g
@@ -392,7 +393,7 @@ export class AcademicoRepository {
    */
   async findHorariosByGrupo(grupoId: number): Promise<IHorario[]> {
     const query = `
-      SELECT id, grupo_id, dia_semana, hora_inicio, hora_fin, aula
+      SELECT id, grupo_id, dia_semana, hora_inicio, hora_fin, aula, DATE_FORMAT(fecha_inicio, '%Y-%m-%d') AS fecha_inicio, DATE_FORMAT(fecha_fin, '%Y-%m-%d') AS fecha_fin
       FROM Horario
       WHERE grupo_id = ?
       ORDER BY FIELD(dia_semana, 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'), hora_inicio ASC
@@ -405,7 +406,7 @@ export class AcademicoRepository {
    * Busca un horario específico por ID
    */
   async findHorarioById(id: number): Promise<IHorario | null> {
-    const query = 'SELECT id, grupo_id, dia_semana, hora_inicio, hora_fin, aula FROM Horario WHERE id = ? LIMIT 1';
+    const query = "SELECT id, grupo_id, dia_semana, hora_inicio, hora_fin, aula, DATE_FORMAT(fecha_inicio, '%Y-%m-%d') AS fecha_inicio, DATE_FORMAT(fecha_fin, '%Y-%m-%d') AS fecha_fin FROM Horario WHERE id = ? LIMIT 1";
     const [rows] = await pool.execute<RowDataPacket[]>(query, [id]);
     if (rows.length === 0) return null;
     return rows[0] as IHorario;
@@ -416,15 +417,17 @@ export class AcademicoRepository {
    */
   async createHorario(data: CreateHorarioDTO): Promise<number> {
     const query = `
-      INSERT INTO Horario (grupo_id, dia_semana, hora_inicio, hora_fin, aula)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO Horario (grupo_id, dia_semana, hora_inicio, hora_fin, aula, fecha_inicio, fecha_fin)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await pool.execute<ResultSetHeader>(query, [
       data.grupo_id,
       data.dia_semana,
       data.hora_inicio,
       data.hora_fin,
-      data.aula.trim()
+      data.aula.trim(),
+      data.fecha_inicio ?? null,
+      data.fecha_fin ?? null
     ]);
     return result.insertId;
   }
@@ -437,6 +440,8 @@ export class AcademicoRepository {
     if (data.hora_inicio !== undefined) { fields.push('hora_inicio = ?'); params.push(data.hora_inicio); }
     if (data.hora_fin !== undefined) { fields.push('hora_fin = ?'); params.push(data.hora_fin); }
     if (data.aula !== undefined) { fields.push('aula = ?'); params.push(data.aula.trim()); }
+    if (data.fecha_inicio !== undefined) { fields.push('fecha_inicio = ?'); params.push(data.fecha_inicio); }
+    if (data.fecha_fin !== undefined) { fields.push('fecha_fin = ?'); params.push(data.fecha_fin); }
     if (fields.length === 0) return true;
     params.push(id);
     const [result] = await pool.execute<ResultSetHeader>(`UPDATE Horario SET ${fields.join(', ')} WHERE id = ?`, params);
@@ -461,19 +466,24 @@ export class AcademicoRepository {
     horaInicio: string,
     horaFin: string,
     excludeGrupoId?: number,
-    excludeHorarioId?: number
+    excludeHorarioId?: number,
+    fechaInicio?: string,
+    fechaFin?: string
   ): Promise<any | null> {
     let query = `
       SELECT h.*, g.nombre AS grupo_nombre, c.nombre AS curso_nombre
       FROM Horario h
       INNER JOIN Grupo g ON h.grupo_id = g.id
       INNER JOIN Curso c ON g.curso_id = c.id
+      INNER JOIN CicloAcademico ca ON g.ciclo_id = ca.id
       WHERE g.docente_id = ?
         AND g.estado = 'ACTIVO'
         AND h.dia_semana = ?
         AND (h.hora_inicio < ? AND h.hora_fin > ?)
+        AND COALESCE(h.fecha_inicio, ca.fecha_inicio) <= ?
+        AND COALESCE(h.fecha_fin, ca.fecha_fin) >= ?
     `;
-    const params: any[] = [docenteId, diaSemana, horaFin, horaInicio];
+    const params: any[] = [docenteId, diaSemana, horaFin, horaInicio, fechaFin ?? '9999-12-31', fechaInicio ?? '1000-01-01'];
 
     if (excludeGrupoId) {
       query += ' AND g.id != ?';
@@ -499,19 +509,24 @@ export class AcademicoRepository {
     horaInicio: string,
     horaFin: string,
     excludeGrupoId?: number,
-    excludeHorarioId?: number
+    excludeHorarioId?: number,
+    fechaInicio?: string,
+    fechaFin?: string
   ): Promise<any | null> {
     let query = `
       SELECT h.*, g.nombre AS grupo_nombre, c.nombre AS curso_nombre
       FROM Horario h
       INNER JOIN Grupo g ON h.grupo_id = g.id
       INNER JOIN Curso c ON g.curso_id = c.id
+      INNER JOIN CicloAcademico ca ON g.ciclo_id = ca.id
       WHERE LOWER(h.aula) = LOWER(?)
         AND g.estado = 'ACTIVO'
         AND h.dia_semana = ?
         AND (h.hora_inicio < ? AND h.hora_fin > ?)
+        AND COALESCE(h.fecha_inicio, ca.fecha_inicio) <= ?
+        AND COALESCE(h.fecha_fin, ca.fecha_fin) >= ?
     `;
-    const params: any[] = [aula.trim(), diaSemana, horaFin, horaInicio];
+    const params: any[] = [aula.trim(), diaSemana, horaFin, horaInicio, fechaFin ?? '9999-12-31', fechaInicio ?? '1000-01-01'];
 
     if (excludeGrupoId) {
       query += ' AND g.id != ?';
@@ -526,6 +541,45 @@ export class AcademicoRepository {
 
     const [rows] = await pool.execute<RowDataPacket[]>(query, params);
     return rows.length > 0 ? rows[0] : null;
+  }
+
+  async checkCrucesHorarioCanal(canalId: number, diaSemana: DiaSemana, horaInicio: string, horaFin: string, fechaInicio: string, fechaFin: string, excludeHorarioId?: number): Promise<any | null> {
+    let query = `
+      SELECT h.*, g.nombre AS grupo_nombre, c.nombre AS curso_nombre
+      FROM Horario h
+      INNER JOIN Grupo g ON h.grupo_id = g.id
+      INNER JOIN Curso c ON g.curso_id = c.id
+      INNER JOIN CicloAcademico ca ON g.ciclo_id = ca.id
+      WHERE g.canal_id = ? AND g.estado = 'ACTIVO' AND h.dia_semana = ?
+        AND (h.hora_inicio < ? AND h.hora_fin > ?)
+        AND COALESCE(h.fecha_inicio, ca.fecha_inicio) <= ?
+        AND COALESCE(h.fecha_fin, ca.fecha_fin) >= ?
+    `;
+    const params: any[] = [canalId, diaSemana, horaFin, horaInicio, fechaFin, fechaInicio];
+    if (excludeHorarioId) { query += ' AND h.id != ?'; params.push(excludeHorarioId); }
+    query += ' LIMIT 1';
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    return rows.length ? rows[0] : null;
+  }
+
+  async findExcepcionesHorario(canalId?: number): Promise<IExcepcionHorario[]> {
+    let query = "SELECT id, canal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, motivo FROM ExcepcionHorario";
+    const params: number[] = [];
+    if (canalId) { query += ' WHERE canal_id = ?'; params.push(canalId); }
+    query += ' ORDER BY fecha ASC';
+    const [rows] = await pool.execute<RowDataPacket[]>(query, params);
+    return rows as IExcepcionHorario[];
+  }
+
+  async createExcepcionHorario(canalId: number, fecha: string, motivo: string): Promise<IExcepcionHorario> {
+    const [result] = await pool.execute<ResultSetHeader>('INSERT INTO ExcepcionHorario (canal_id, fecha, motivo) VALUES (?, ?, ?)', [canalId, fecha, motivo.trim()]);
+    const [rows] = await pool.execute<RowDataPacket[]>("SELECT id, canal_id, DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, motivo FROM ExcepcionHorario WHERE id = ?", [result.insertId]);
+    return rows[0] as IExcepcionHorario;
+  }
+
+  async deleteExcepcionHorario(id: number): Promise<boolean> {
+    const [result] = await pool.execute<ResultSetHeader>('DELETE FROM ExcepcionHorario WHERE id = ?', [id]);
+    return result.affectedRows > 0;
   }
 }
 

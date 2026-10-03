@@ -7,9 +7,14 @@ export type DetalleAsistenciaInput = { estudiante_id: number; estado_asistencia:
 
 export class AsistenciaRepository {
   async findGroup(grupoId: number, docenteId?: number) {
-    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT id, docente_id FROM Grupo WHERE id = ?${docenteId ? ' AND docente_id = ?' : ''}`,
+    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT id, docente_id, canal_id FROM Grupo WHERE id = ?${docenteId ? ' AND docente_id = ?' : ''}`,
       docenteId ? [grupoId, docenteId] : [grupoId]);
     return rows[0] || null;
+  }
+
+  async findScheduleHoliday(canalId: number, fecha: string): Promise<string | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>('SELECT motivo FROM ExcepcionHorario WHERE canal_id = ? AND fecha = ? LIMIT 1', [canalId, fecha]);
+    return rows.length ? String(rows[0].motivo) : null;
   }
 
   async findSessions(filters: AsistenciaFiltro = {}) {

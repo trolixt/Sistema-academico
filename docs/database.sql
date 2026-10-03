@@ -247,7 +247,38 @@ CREATE TABLE IF NOT EXISTS Horario (
     hora_inicio TIME NOT NULL,
     hora_fin TIME NOT NULL,
     aula VARCHAR(50) NOT NULL,
+    fecha_inicio DATE NULL,
+    fecha_fin DATE NULL,
     FOREIGN KEY (grupo_id) REFERENCES Grupo(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+SET @tiene_fecha_inicio_horario = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Horario' AND COLUMN_NAME = 'fecha_inicio'
+);
+SET @ddl_fecha_inicio_horario = IF(@tiene_fecha_inicio_horario = 0,
+    'ALTER TABLE Horario ADD COLUMN fecha_inicio DATE NULL AFTER aula', 'SELECT 1');
+PREPARE stmt_fecha_inicio_horario FROM @ddl_fecha_inicio_horario;
+EXECUTE stmt_fecha_inicio_horario;
+DEALLOCATE PREPARE stmt_fecha_inicio_horario;
+
+SET @tiene_fecha_fin_horario = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Horario' AND COLUMN_NAME = 'fecha_fin'
+);
+SET @ddl_fecha_fin_horario = IF(@tiene_fecha_fin_horario = 0,
+    'ALTER TABLE Horario ADD COLUMN fecha_fin DATE NULL AFTER fecha_inicio', 'SELECT 1');
+PREPARE stmt_fecha_fin_horario FROM @ddl_fecha_fin_horario;
+EXECUTE stmt_fecha_fin_horario;
+DEALLOCATE PREPARE stmt_fecha_fin_horario;
+
+CREATE TABLE IF NOT EXISTS ExcepcionHorario (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    canal_id TINYINT UNSIGNED NOT NULL,
+    fecha DATE NOT NULL,
+    motivo VARCHAR(150) NOT NULL,
+    UNIQUE KEY uq_excepcion_horario_canal_fecha (canal_id, fecha),
+    FOREIGN KEY (canal_id) REFERENCES Canal(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS Matricula (

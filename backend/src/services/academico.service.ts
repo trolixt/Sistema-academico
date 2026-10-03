@@ -13,7 +13,10 @@ import {
   FiltrosGrupoDTO,
   IHorario,
   CreateHorarioDTO,
-  UpdateHorarioDTO
+  UpdateHorarioDTO,
+  CreateHorarioRecurrenteDTO,
+  IExcepcionHorario,
+  DiaSemana
 } from '../types';
 
 export class AcademicoService {
@@ -377,37 +380,17 @@ export class AcademicoService {
       throw error;
     }
 
-    // Validación A: Control de colisión de horario del Docente
-    const cruceDocente = await this.repo.checkCrucesHorarioDocente(
-      grupo.docente_id,
-      dia_semana,
-      hora_inicio,
-      hora_fin
-    );
-    if (cruceDocente) {
-      const error: any = new Error(
-        `Conflicto de Horario del Docente: El profesor ya tiene asignada la clase "${cruceDocente.curso_nombre}" (${cruceDocente.grupo_nombre}) el ${dia_semana} de ${cruceDocente.hora_inicio} a ${cruceDocente.hora_fin}.`
-      );
-      error.statusCode = 400;
-      throw error;
-    }
+    const fechaInicio = dto.fecha_inicio || dateOnly(grupo.ciclo_fecha_inicio);
+    const fechaFin = dto.fecha_fin || dateOnly(grupo.ciclo_fecha_fin);
+    validateScheduleDates(fechaInicio, fechaFin, dateOnly(grupo.ciclo_fecha_inicio), dateOnly(grupo.ciclo_fecha_fin));
+    validateShiftTime(hora_inicio, hora_fin);
 
-    // Validación B: Control de colisión de disponibilidad del Aula
-    const cruceAula = await this.repo.checkCrucesHorarioAula(
-      aula,
-      dia_semana,
-      hora_inicio,
-      hora_fin
-    );
-    if (cruceAula) {
-      const error: any = new Error(
-        `Conflicto de Aula: El "${aula}" ya se encuentra ocupada por el grupo "${cruceAula.grupo_nombre}" (${cruceAula.curso_nombre}) el ${dia_semana} de ${cruceAula.hora_inicio} a ${cruceAula.hora_fin}.`
-      );
-      error.statusCode = 400;
-      throw error;
-    }
+    const intervals = occupiedTimeParts(hora_inicio, hora_fin);
+    if (!intervals.length) throw scheduleError('La clase no puede programarse durante el descanso de 15 minutos.');
 
-    const insertId = await this.repo.createHorario(dto);
+    await this.validateScheduleConflicts(grupo, dia_semana, intervals, aula, fechaInicio, fechaFin);
+
+    const insertId = await this.repo.createHorario({ ...dto, fecha_inicio: fechaInicio, fecha_fin: fechaFin });
     const nuevoHorario = await this.repo.findHorarioById(insertId);
     return nuevoHorario!;
   }
@@ -437,23 +420,69 @@ export class AcademicoService {
       error.statusCode = 400;
       throw error;
     }
+    const fechaInicio = dto.fecha_inicio || actual.fecha_inicio || dateOnly(grupo.ciclo_fecha_inicio);
+    const fechaFin = dto.fecha_fin || actual.fecha_fin || dateOnly(grupo.ciclo_fecha_fin);
+    validateScheduleDates(fechaInicio, fechaFin, dateOnly(grupo.ciclo_fecha_inicio), dateOnly(grupo.ciclo_fecha_fin));
+    validateShiftTime(horaInicio, horaFin);
+    const intervals = occupiedTimeParts(horaInicio, horaFin);
+    if (!intervals.length) throw scheduleError('La clase no puede programarse durante el descanso de 15 minutos.');
+    await this.validateScheduleConflicts(grupo, dia, intervals, aula, fechaInicio, fechaFin, id);
 
-    const cruceDocente = await this.repo.checkCrucesHorarioDocente(grupo.docente_id, dia, horaInicio, horaFin, undefined, id);
-    if (cruceDocente) {
-      const error: any = new Error(`Conflicto de Horario del Docente: El profesor ya tiene asignada la clase "${cruceDocente.curso_nombre}" (${cruceDocente.grupo_nombre}) el ${dia} de ${cruceDocente.hora_inicio} a ${cruceDocente.hora_fin}.`);
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const cruceAula = await this.repo.checkCrucesHorarioAula(aula, dia, horaInicio, horaFin, undefined, id);
-    if (cruceAula) {
-      const error: any = new Error(`Conflicto de Aula: El "${aula}" ya se encuentra ocupada por el grupo "${cruceAula.grupo_nombre}" (${cruceAula.curso_nombre}) el ${dia} de ${cruceAula.hora_inicio} a ${cruceAula.hora_fin}.`);
-      error.statusCode = 400;
-      throw error;
-    }
-
-    await this.repo.updateHorario(id, dto);
+    await this.repo.updateHorario(id, { ...dto, fecha_inicio: fechaInicio, fecha_fin: fechaFin });
     return (await this.repo.findHorarioById(id))!;
+  }
+
+  async createHorariosRecurrentes(dto: CreateHorarioRecurrenteDTO): Promise<IHorario[]> {
+    const days = Array.isArray(dto.dias_semana) ? [...new Set(dto.dias_semana)] : [];
+    if (!days.length) throw scheduleError('Selecciona al menos un día para repetir la clase.');
+    if (days.some((day) => !['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'].includes(day))) throw scheduleError('Uno de los días seleccionados no es válido.');
+    if (!days.some((day) => occursOnWeekday(dto.fecha_inicio, dto.fecha_fin, day))) throw scheduleError('El periodo seleccionado no incluye ninguno de los días marcados.');
+    const created: number[] = [];
+    try {
+      for (const dia_semana of days) {
+        const horario = await this.createHorario({ ...dto, dia_semana });
+        created.push(horario.id);
+      }
+      return (await this.getGrupoById(dto.grupo_id)).horarios?.filter((item) => created.includes(item.id)) ?? [];
+    } catch (cause) {
+      await Promise.all(created.map((id) => this.repo.deleteHorario(id)));
+      throw cause;
+    }
+  }
+
+  async getExcepcionesHorario(canalId?: number): Promise<IExcepcionHorario[]> {
+    if (canalId !== undefined && (!Number.isInteger(canalId) || canalId < 1 || canalId > 4)) throw scheduleError('El canal debe ser del 1 al 4.');
+    return this.repo.findExcepcionesHorario(canalId);
+  }
+
+  async createExcepcionHorario(canalId: number, fecha: string, motivo: string): Promise<IExcepcionHorario> {
+    if (!Number.isInteger(canalId) || canalId < 1 || canalId > 4) throw scheduleError('El canal debe ser del 1 al 4.');
+    const canal = await this.repo.findCanal(canalId);
+    if (!canal || canal.estado !== 'ACTIVO') throw scheduleError('Selecciona un canal activo.');
+    if (!isValidDateOnly(fecha)) throw scheduleError('Ingresa una fecha válida.');
+    if (!motivo.trim()) throw scheduleError('Describe el motivo de la suspensión.');
+    try { return await this.repo.createExcepcionHorario(canalId, fecha, motivo); }
+    catch (cause) {
+      if ((cause as { code?: string }).code === 'ER_DUP_ENTRY') throw scheduleError('Ese canal ya tiene una suspensión registrada para esa fecha.', 409);
+      throw cause;
+    }
+  }
+
+  async deleteExcepcionHorario(id: number): Promise<boolean> {
+    const deleted = await this.repo.deleteExcepcionHorario(id);
+    if (!deleted) throw scheduleError('No se encontró la suspensión seleccionada.', 404);
+    return true;
+  }
+
+  private async validateScheduleConflicts(grupo: IGrupoDetalle, dia: DiaSemana, intervals: Array<[string, string]>, aula: string, fechaInicio: string, fechaFin: string, horarioId?: number) {
+    for (const [inicio, fin] of intervals) {
+      const canalConflict = await this.repo.checkCrucesHorarioCanal(grupo.canal_id, dia, inicio, fin, fechaInicio, fechaFin, horarioId);
+      if (canalConflict) throw scheduleError(`Cruce de horario en el canal ${grupo.canal_id}: ${canalConflict.curso_nombre} ya está programado ese día de ${canalConflict.hora_inicio.slice(0, 5)} a ${canalConflict.hora_fin.slice(0, 5)}.`);
+      const teacherConflict = await this.repo.checkCrucesHorarioDocente(grupo.docente_id, dia, inicio, fin, undefined, horarioId, fechaInicio, fechaFin);
+      if (teacherConflict) throw scheduleError(`El docente ya tiene ${teacherConflict.curso_nombre} (${teacherConflict.grupo_nombre}) ese día de ${teacherConflict.hora_inicio.slice(0, 5)} a ${teacherConflict.hora_fin.slice(0, 5)}.`);
+      const roomConflict = await this.repo.checkCrucesHorarioAula(aula, dia, inicio, fin, undefined, horarioId, fechaInicio, fechaFin);
+      if (roomConflict) throw scheduleError(`El aula ${aula} ya está ocupada por ${roomConflict.curso_nombre} (${roomConflict.grupo_nombre}) ese día de ${roomConflict.hora_inicio.slice(0, 5)} a ${roomConflict.hora_fin.slice(0, 5)}.`);
+    }
   }
 
   async deleteHorario(id: number): Promise<{ message: string }> {
@@ -472,6 +501,64 @@ export class AcademicoService {
 function monthDistance(start: Date, end: Date): number {
   return (end.getUTCFullYear() - start.getUTCFullYear()) * 12
     + end.getUTCMonth() - start.getUTCMonth();
+}
+
+function dateOnly(value: string | Date): string {
+  if (typeof value === 'string') return value.slice(0, 10);
+  return value.toISOString().slice(0, 10);
+}
+
+function scheduleError(message: string, statusCode = 400): Error & { statusCode: number } {
+  return Object.assign(new Error(message), { statusCode });
+}
+
+function validateScheduleDates(start: string, end: string, cycleStart: string, cycleEnd: string): void {
+  if (!isValidDateOnly(start) || !isValidDateOnly(end) || start > end) throw scheduleError('El periodo del horario no es válido.');
+  if (start < cycleStart || end > cycleEnd) throw scheduleError(`El horario debe estar dentro del ciclo académico (${cycleStart} al ${cycleEnd}).`);
+}
+
+function validateShiftTime(start: string, end: string): void {
+  const normalize = (value: string) => value.slice(0, 5);
+  const timeIsValid = (value: string) => /^\d{2}:\d{2}(:\d{2})?$/.test(value) && Number(value.slice(0, 2)) <= 23 && Number(value.slice(3, 5)) <= 59;
+  const startTime = normalize(start);
+  const endTime = normalize(end);
+  const am = startTime >= '08:00' && endTime <= '12:00';
+  const pm = startTime >= '13:00' && endTime <= '17:00';
+  const startsDuringBreak = (time: string) => (time >= '09:45' && time < '10:00') || (time >= '14:45' && time < '15:00');
+  const endsDuringBreak = (time: string) => (time > '09:45' && time < '10:00') || (time > '14:45' && time < '15:00');
+  if (!timeIsValid(start) || !timeIsValid(end) || !(am || pm) || startTime >= endTime) throw scheduleError('Las clases deben quedar dentro del turno mañana (08:00–12:00) o tarde (13:00–17:00).');
+  if (startsDuringBreak(startTime) || endsDuringBreak(endTime)) throw scheduleError('El inicio o el fin de la clase no puede quedar dentro del bloque de descanso.');
+}
+
+function occupiedTimeParts(start: string, end: string): Array<[string, string]> {
+  const normalizedStart = start.slice(0, 5);
+  const normalizedEnd = end.slice(0, 5);
+  const morning = normalizedStart >= '08:00' && normalizedEnd <= '12:00';
+  const breakStart = morning ? '09:45' : '14:45';
+  const breakEnd = morning ? '10:00' : '15:00';
+  if (normalizedEnd <= breakStart || normalizedStart >= breakEnd) return [[normalizedStart, normalizedEnd]];
+  const parts: Array<[string, string]> = [];
+  if (normalizedStart < breakStart) parts.push([normalizedStart, breakStart]);
+  if (normalizedEnd > breakEnd) parts.push([breakEnd, normalizedEnd]);
+  return parts;
+}
+
+function isValidDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function occursOnWeekday(start: string, end: string, weekday: DiaSemana): boolean {
+  const target = ['DOMINGO', 'LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO'].indexOf(weekday);
+  if (target < 0) return false;
+  const date = new Date(`${start}T00:00:00Z`);
+  const final = new Date(`${end}T00:00:00Z`);
+  while (date <= final) {
+    if (date.getUTCDay() === target) return true;
+    date.setUTCDate(date.getUTCDate() + 1);
+  }
+  return false;
 }
 
 export const academicoService = new AcademicoService();

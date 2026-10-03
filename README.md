@@ -44,7 +44,7 @@ Hay cuatro canales fijos. Cada estudiante se matricula en un canal y, por perten
 3. **Canal 3 — Ciencias Sociales, Letras y Humanidades:** Lenguaje y Literatura, Historia (del Perú y Universal), Geografía, Economía, Educación Cívica, Filosofía y Psicología, Razonamiento Verbal y Razonamiento Matemático.
 4. **Canal 4 — Ciencias Empresariales y Actuariales:** Economía, Aritmética, Álgebra, Razonamiento Matemático, Razonamiento Verbal, Lenguaje, Historia y Geografía.
 
-El administrador puede editar la información y las áreas de cada canal, además de organizar docentes, grupos y horarios. Una cuenta docente puede ser desactivada si no conserva grupos activos; reasignar esos grupos permite completar la desactivación.
+El administrador puede editar la información y las áreas de cada canal, además de organizar docentes, grupos y horarios. En Horarios se elige canal y turno, y se programa desde una cuadrícula semanal: solo las franjas de clase son editables; el descanso del segundo bloque es fijo. Cada regla se repite en los días elegidos por los meses indicados dentro del ciclo de seis meses. La vista de todo el horario permite buscar una fecha y marcarla como feriado para el canal. Los horarios se validan contra otras materias del canal, docentes y aulas, dentro de los turnos de 08:00 a 12:00 y de 13:00 a 17:00. Una cuenta docente puede ser desactivada si no conserva grupos activos; reasignar esos grupos permite completar la desactivación.
 
 ## Estudiantes y matrícula
 

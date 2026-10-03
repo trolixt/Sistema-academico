@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { academicoService, AcademicoService } from '../services/academico.service';
-import { AuthenticatedRequest, CreateCursoDTO, UpdateCursoDTO, CreateCicloDTO, UpdateCicloDTO, CreateGrupoDTO, UpdateGrupoDTO, CreateHorarioDTO, UpdateHorarioDTO } from '../types';
+import { AuthenticatedRequest, CreateCursoDTO, UpdateCursoDTO, CreateCicloDTO, UpdateCicloDTO, CreateGrupoDTO, UpdateGrupoDTO, CreateHorarioDTO, UpdateHorarioDTO, CreateHorarioRecurrenteDTO } from '../types';
 
 export class AcademicoController {
   private service: AcademicoService;
@@ -275,6 +275,34 @@ export class AcademicoController {
     } catch (error) {
       next(error);
     }
+  };
+
+  createHorariosRecurrentes = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const horarios = await this.service.createHorariosRecurrentes(req.body as CreateHorarioRecurrenteDTO);
+      res.status(201).json({ success: true, message: 'Clases recurrentes creadas para los días seleccionados.', data: horarios });
+    } catch (error) { next(error); }
+  };
+
+  getExcepcionesHorario = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const canalId = req.query.canal_id === undefined ? undefined : Number(req.query.canal_id);
+      res.status(200).json({ success: true, data: await this.service.getExcepcionesHorario(canalId) });
+    } catch (error) { next(error); }
+  };
+
+  createExcepcionHorario = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const data = await this.service.createExcepcionHorario(Number(req.body.canal_id), String(req.body.fecha || ''), String(req.body.motivo || ''));
+      res.status(201).json({ success: true, message: 'Suspensión de clases registrada.', data });
+    } catch (error) { next(error); }
+  };
+
+  deleteExcepcionHorario = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await this.service.deleteExcepcionHorario(Number(req.params.id));
+      res.status(200).json({ success: true, message: 'Suspensión eliminada.', data: null });
+    } catch (error) { next(error); }
   };
 
   updateHorario = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

@@ -60,9 +60,13 @@ router.delete('/grupos/:id', authorizeRoles('ADMINISTRADOR'), academicoControlle
 // ==========================================
 // Consulta de horarios por grupo
 router.get('/grupos/:grupoId/horarios', academicoController.getHorariosByGrupo);
+router.get('/horarios/excepciones', academicoController.getExcepcionesHorario);
 
 // Gestión: Solo Administrador
 router.post('/horarios', authorizeRoles('ADMINISTRADOR'), academicoController.createHorario);
+router.post('/horarios/recurrentes', authorizeRoles('ADMINISTRADOR'), academicoController.createHorariosRecurrentes);
+router.post('/horarios/excepciones', authorizeRoles('ADMINISTRADOR'), academicoController.createExcepcionHorario);
+router.delete('/horarios/excepciones/:id', authorizeRoles('ADMINISTRADOR'), academicoController.deleteExcepcionHorario);
 router.put('/horarios/:id', authorizeRoles('ADMINISTRADOR'), academicoController.updateHorario);
 router.delete('/horarios/:id', authorizeRoles('ADMINISTRADOR'), academicoController.deleteHorario);
 

@@ -5,12 +5,15 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { apiRequest } from "@/lib/api/client";
 
 type Row = Record<string, any>;
+type ScheduleException = { canal_id: number; fecha: string };
 const weekdays = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
 const weekdayLabel: Record<string, string> = { LUNES: "Lunes", MARTES: "Martes", MIERCOLES: "Miércoles", JUEVES: "Jueves", VIERNES: "Viernes", SABADO: "Sábado", DOMINGO: "Domingo" };
 
 export function SchedulePage() {
   const { token, usuario } = useAuth();
   const [groups, setGroups] = useState<Row[]>([]);
+  const [exceptions, setExceptions] = useState<ScheduleException[]>([]);
+  const [today, setToday] = useState("");
   const [filter, setFilter] = useState("TODOS");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -24,20 +27,30 @@ export function SchedulePage() {
     setLoading(true); setError("");
     try {
       const path = usuario.rol === "ESTUDIANTE" || usuario.rol === "DOCENTE" ? "/academicos/grupos/me" : "/academicos/grupos";
-      setGroups(await apiRequest<Row[]>(path, token));
+      const [nextGroups, nextExceptions] = await Promise.all([
+        apiRequest<Row[]>(path, token),
+        apiRequest<ScheduleException[]>("/academicos/horarios/excepciones", token),
+      ]);
+      setGroups(nextGroups); setExceptions(nextExceptions);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudieron consultar los horarios."); }
     finally { setLoading(false); }
   }, [token, usuario]);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { const now = new Date(); setToday(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`); }, []);
 
   const schedules = useMemo<Row[]>(() => groups.flatMap((group) => (Array.isArray(group.horarios) ? group.horarios : []).map((schedule: Row) => ({
     ...schedule,
     grupo_id: Number(group.id),
+    canal_id: Number(group.canal_id),
+    fecha_inicio: schedule.fecha_inicio || group.ciclo_fecha_inicio,
+    fecha_fin: schedule.fecha_fin || group.ciclo_fecha_fin,
     grupo_nombre: group.nombre,
     curso_nombre: group.curso_nombre,
     docente: [group.docente_nombres, group.docente_apellidos].filter(Boolean).join(" "),
-  } as Row))).filter((schedule) => filter === "TODOS" || String(schedule.grupo_id) === filter)
-    .sort((a, b) => weekdays.indexOf(a.dia_semana) - weekdays.indexOf(b.dia_semana) || String(a.hora_inicio).localeCompare(String(b.hora_inicio))), [groups, filter]);
+  } as Row))).filter((schedule) => (filter === "TODOS" || String(schedule.grupo_id) === filter)
+    && (!today || ((!schedule.fecha_inicio || String(schedule.fecha_inicio).slice(0, 10) <= today) && (!schedule.fecha_fin || String(schedule.fecha_fin).slice(0, 10) >= today)))
+    && !exceptions.some((exception) => Number(exception.canal_id) === Number(schedule.canal_id) && exception.fecha === weekdayDate(today, schedule.dia_semana)))
+    .sort((a, b) => weekdays.indexOf(a.dia_semana) - weekdays.indexOf(b.dia_semana) || String(a.hora_inicio).localeCompare(String(b.hora_inicio))), [groups, filter, exceptions, today]);
 
   async function createSchedule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!token) return;
@@ -64,3 +77,12 @@ export function SchedulePage() {
 }
 
 function timeLabel(value: string) { return value ? String(value).slice(0, 5) : "—"; }
+function weekdayDate(today: string, weekday: string) {
+  if (!today) return "";
+  const date = new Date(`${today}T12:00:00`);
+  const mondayIndex = (date.getDay() + 6) % 7;
+  const targetIndex = weekdays.indexOf(weekday);
+  if (targetIndex < 0) return "";
+  date.setDate(date.getDate() + targetIndex - mondayIndex);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}

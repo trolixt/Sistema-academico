@@ -158,6 +158,8 @@ export interface IHorario {
   hora_inicio: string;
   hora_fin: string;
   aula: string;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
 }
 
 export interface CreateHorarioDTO {
@@ -166,6 +168,8 @@ export interface CreateHorarioDTO {
   hora_inicio: string;
   hora_fin: string;
   aula: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
 }
 
 export interface UpdateHorarioDTO {
@@ -174,6 +178,25 @@ export interface UpdateHorarioDTO {
   hora_inicio?: string;
   hora_fin?: string;
   aula?: string;
+  fecha_inicio?: string;
+  fecha_fin?: string;
+}
+
+export interface CreateHorarioRecurrenteDTO {
+  grupo_id: number;
+  dias_semana: DiaSemana[];
+  hora_inicio: string;
+  hora_fin: string;
+  aula: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+}
+
+export interface IExcepcionHorario {
+  id: number;
+  canal_id: number;
+  fecha: string;
+  motivo: string;
 }
 
 // ==========================================

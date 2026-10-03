@@ -24,6 +24,8 @@ export class AsistenciaService {
     }
     const group = await asistenciaRepository.findGroup(grupoId, docenteId);
     if (!group) { const error: any = new Error(docenteId ? 'El grupo no existe o no está asignado a este docente' : 'Grupo no encontrado'); error.statusCode = docenteId ? 403 : 404; throw error; }
+    const holiday = await asistenciaRepository.findScheduleHoliday(Number(group.canal_id), fecha);
+    if (holiday) { const error: any = new Error(`No se puede abrir asistencia: no hay clases por ${holiday}.`); error.statusCode = 400; throw error; }
     const id = await asistenciaRepository.openSession(grupoId, fecha);
     return this.getSession(id, docenteId);
   }

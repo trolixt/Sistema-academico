@@ -10,7 +10,7 @@ import { SecretariaSection } from "./secretaria-section";
 const sections = [
   { path: "/administracion", name: "Canales", hint: "Áreas y estudiantes" },
   { path: "/administracion/docentes", name: "Docentes", hint: "Perfiles y asignaciones" },
-  { path: "/administracion/horarios", name: "Horarios", hint: "Clases por grupo" },
+  { path: "/administracion/horarios", name: "Horarios", hint: "Programación por canal y ciclo" },
   { path: "/administracion/secretaria", name: "Secretaría", hint: "Cuentas y perfiles" },
 ];
 
