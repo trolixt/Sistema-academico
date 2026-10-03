@@ -13,6 +13,7 @@ export function SchedulePage() {
   const { token, usuario } = useAuth();
   const [groups, setGroups] = useState<Row[]>([]);
   const [exceptions, setExceptions] = useState<ScheduleException[]>([]);
+  const [studentTurn, setStudentTurn] = useState<"MANANA" | "TARDE" | null>(null);
   const [today, setToday] = useState("");
   const [filter, setFilter] = useState("TODOS");
   const [loading, setLoading] = useState(true);
@@ -27,11 +28,13 @@ export function SchedulePage() {
     setLoading(true); setError("");
     try {
       const path = usuario.rol === "ESTUDIANTE" || usuario.rol === "DOCENTE" ? "/academicos/grupos/me" : "/academicos/grupos";
-      const [nextGroups, nextExceptions] = await Promise.all([
+      const [nextGroups, nextExceptions, studentProfile] = await Promise.all([
         apiRequest<Row[]>(path, token),
         apiRequest<ScheduleException[]>("/academicos/horarios/excepciones", token),
+        usuario.rol === "ESTUDIANTE" ? apiRequest<Row>("/estudiantes/me", token) : Promise.resolve(null),
       ]);
       setGroups(nextGroups); setExceptions(nextExceptions);
+      setStudentTurn(studentProfile?.turno === "TARDE" ? "TARDE" : studentProfile?.turno === "MANANA" ? "MANANA" : null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudieron consultar los horarios."); }
     finally { setLoading(false); }
   }, [token, usuario]);
@@ -47,10 +50,11 @@ export function SchedulePage() {
     grupo_nombre: group.nombre,
     curso_nombre: group.curso_nombre,
     docente: [group.docente_nombres, group.docente_apellidos].filter(Boolean).join(" "),
-  } as Row))).filter((schedule) => (filter === "TODOS" || String(schedule.grupo_id) === filter)
+  } as Row))).filter((schedule) => (usuario?.rol !== "ESTUDIANTE" || !studentTurn || (studentTurn === "MANANA" ? String(schedule.hora_inicio).slice(0, 5) >= "08:00" && String(schedule.hora_fin).slice(0, 5) <= "12:00" : String(schedule.hora_inicio).slice(0, 5) >= "13:00" && String(schedule.hora_fin).slice(0, 5) <= "17:00"))
+    && (filter === "TODOS" || String(schedule.grupo_id) === filter)
     && (!today || ((!schedule.fecha_inicio || String(schedule.fecha_inicio).slice(0, 10) <= today) && (!schedule.fecha_fin || String(schedule.fecha_fin).slice(0, 10) >= today)))
     && !exceptions.some((exception) => Number(exception.canal_id) === Number(schedule.canal_id) && exception.fecha === weekdayDate(today, schedule.dia_semana)))
-    .sort((a, b) => weekdays.indexOf(a.dia_semana) - weekdays.indexOf(b.dia_semana) || String(a.hora_inicio).localeCompare(String(b.hora_inicio))), [groups, filter, exceptions, today]);
+    .sort((a, b) => weekdays.indexOf(a.dia_semana) - weekdays.indexOf(b.dia_semana) || String(a.hora_inicio).localeCompare(String(b.hora_inicio))), [groups, filter, exceptions, today, studentTurn, usuario]);
 
   async function createSchedule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!token) return;
@@ -65,7 +69,7 @@ export function SchedulePage() {
   }
 
   return <section className="schedule-page">
-    <div className="page-intro"><div><span className="eyebrow">ORGANIZACIÓN ACADÉMICA</span><h2>{usuario?.rol === "ESTUDIANTE" || usuario?.rol === "DOCENTE" ? "Mi horario semanal" : "Horario semanal"}</h2><p>Clases y aulas organizadas por día, según los grupos y horarios registrados.</p></div>{canCreate && <button className="button primary" onClick={() => setShowForm((open) => !open)}>{showForm ? "Cerrar formulario" : "＋ Agregar horario"}</button>}</div>
+    <div className="page-intro"><div><span className="eyebrow">ORGANIZACIÓN ACADÉMICA</span><h2>{usuario?.rol === "ESTUDIANTE" || usuario?.rol === "DOCENTE" ? "Mi horario semanal" : "Horario semanal"}</h2><p>{usuario?.rol === "ESTUDIANTE" ? `Clases de tu turno ${studentTurn === "TARDE" ? "tarde · 13:00 a 17:00" : studentTurn === "MANANA" ? "mañana · 08:00 a 12:00" : "asignado"}, organizadas por día.` : "Clases y aulas organizadas por día, según los grupos y horarios registrados."}</p></div>{canCreate && <button className="button primary" onClick={() => setShowForm((open) => !open)}>{showForm ? "Cerrar formulario" : "＋ Agregar horario"}</button>}</div>
     <div className="schedule-toolbar"><div><strong>{schedules.length}</strong> {schedules.length === 1 ? "clase programada" : "clases programadas"}</div><label>Grupo<select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="TODOS">Todos mis grupos</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.curso_nombre} · {group.nombre}</option>)}</select></label></div>
     {error && <div className="alert error" role="alert">{error}</div>}{notice && <div className="alert success">{notice}</div>}
     {showForm && canCreate && <section className="table-panel schedule-form-panel"><div className="section-heading"><div><h3>Programar una clase</h3><p>El sistema avisará si coincide con otra clase del docente o del aula.</p></div></div><form className="schedule-form" onSubmit={createSchedule}><label>Grupo<select name="grupo_id" required defaultValue=""><option value="">Seleccionar grupo…</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.curso_nombre} · {group.nombre}</option>)}</select></label><label>Día<select name="dia_semana" required defaultValue=""><option value="" disabled>Seleccionar día…</option>{weekdays.map((day) => <option key={day} value={day}>{weekdayLabel[day]}</option>)}</select></label><label>Desde<input name="hora_inicio" type="time" required /></label><label>Hasta<input name="hora_fin" type="time" required /></label><label>Aula<input name="aula" placeholder="Ej. Aula 3" required /></label><button className="button primary" disabled={saving}>{saving ? "Guardando…" : "Guardar horario"}</button></form></section>}

@@ -60,6 +60,7 @@ export interface IEstudiante {
   usuario_id: number;
   canal_id: number | null;
   canal_nombre?: string | null;
+  turno: 'MANANA' | 'TARDE';
   codigo_estudiante: string;
   nombres: string;
   apellidos: string;
@@ -261,6 +262,7 @@ export interface FiltrosGrupoDTO {
 // ==========================================
 export interface CreateEstudianteDTO {
   canal_id?: number;
+  turno: 'MANANA' | 'TARDE';
   nombres: string;
   apellidos: string;
   dni: string;
@@ -274,6 +276,7 @@ export interface CreateEstudianteDTO {
 
 export interface UpdateEstudianteDTO {
   canal_id?: number | null;
+  turno?: 'MANANA' | 'TARDE';
   nombres?: string;
   apellidos?: string;
   dni?: string;

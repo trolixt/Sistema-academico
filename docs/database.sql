@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS Estudiante (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL UNIQUE,
     canal_id TINYINT UNSIGNED NULL,
+    turno ENUM('MANANA', 'TARDE') NOT NULL DEFAULT 'MANANA',
     codigo_estudiante VARCHAR(50) NOT NULL UNIQUE,
     nombres VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
@@ -149,6 +150,16 @@ SET @ddl_canal_estudiante = IF(@tiene_canal_estudiante = 0,
 PREPARE stmt_canal_estudiante FROM @ddl_canal_estudiante;
 EXECUTE stmt_canal_estudiante;
 DEALLOCATE PREPARE stmt_canal_estudiante;
+
+SET @tiene_turno_estudiante = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Estudiante' AND COLUMN_NAME = 'turno'
+);
+SET @ddl_turno_estudiante = IF(@tiene_turno_estudiante = 0,
+    'ALTER TABLE Estudiante ADD COLUMN turno ENUM(''MANANA'', ''TARDE'') NOT NULL DEFAULT ''MANANA'' AFTER canal_id', 'SELECT 1');
+PREPARE stmt_turno_estudiante FROM @ddl_turno_estudiante;
+EXECUTE stmt_turno_estudiante;
+DEALLOCATE PREPARE stmt_turno_estudiante;
 
 SET @tiene_fk_canal_estudiante = (
     SELECT COUNT(*) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE

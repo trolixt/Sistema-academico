@@ -74,6 +74,11 @@ export class EstudianteService {
       error.statusCode = 400;
       throw error;
     }
+    if (!isValidTurno(dto.turno)) {
+      const error: any = new Error('Selecciona el turno mañana o tarde para el estudiante');
+      error.statusCode = 400;
+      throw error;
+    }
     if (!dto.dni?.trim()) {
       const error: any = new Error('El DNI es obligatorio');
       error.statusCode = 400;
@@ -136,6 +141,7 @@ export class EstudianteService {
       apellidos: dto.apellidos,
       dni: dto.dni,
       fecha_nacimiento: dto.fecha_nacimiento,
+      turno: dto.turno,
       telefono: dto.telefono,
       correo: dto.correo,
       direccion: dto.direccion,
@@ -155,6 +161,11 @@ export class EstudianteService {
     }
     validarDni(dto.dni);
     validarTelefono(dto.telefono);
+    if (dto.turno !== undefined && !isValidTurno(dto.turno)) {
+      const error: any = new Error('Selecciona el turno mañana o tarde para el estudiante');
+      error.statusCode = 400;
+      throw error;
+    }
     if (dto.dni !== undefined) dto.dni = dto.dni.trim();
     if (dto.telefono !== undefined) dto.telefono = dto.telefono.trim();
 
@@ -190,8 +201,8 @@ export class EstudianteService {
       error.statusCode = 409;
       throw error;
     }
-    if (!dto.nombres?.trim() || !dto.apellidos?.trim() || !dto.dni?.trim() || !dto.fecha_nacimiento || !dto.canal_id) {
-      const error: any = new Error('Completa nombres, apellidos, DNI, nacimiento y canal para reincorporar');
+    if (!dto.nombres?.trim() || !dto.apellidos?.trim() || !dto.dni?.trim() || !dto.fecha_nacimiento || !dto.canal_id || !isValidTurno(dto.turno)) {
+      const error: any = new Error('Completa nombres, apellidos, DNI, nacimiento, canal y turno para reincorporar');
       error.statusCode = 400;
       throw error;
     }
@@ -222,3 +233,7 @@ export class EstudianteService {
 }
 
 export const estudianteService = new EstudianteService();
+
+function isValidTurno(value: unknown): value is 'MANANA' | 'TARDE' {
+  return value === 'MANANA' || value === 'TARDE';
+}

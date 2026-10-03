@@ -10,7 +10,7 @@ export class EstudianteRepository {
    */
   async findAll(includeInactive = false): Promise<EstudianteConUsuario[]> {
     const query = `
-      SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
+      SELECT e.id, e.usuario_id, e.canal_id, e.turno, ca.nombre AS canal_nombre, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
              e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
              u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e
@@ -28,7 +28,7 @@ export class EstudianteRepository {
    */
   async findById(id: number): Promise<EstudianteConUsuario | null> {
     const query = `
-      SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
+      SELECT e.id, e.usuario_id, e.canal_id, e.turno, ca.nombre AS canal_nombre, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
              e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
              u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e
@@ -43,7 +43,7 @@ export class EstudianteRepository {
   }
 
   async findByEitherId(id: string): Promise<EstudianteConUsuario[]> {
-    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre,
+    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT e.id, e.usuario_id, e.canal_id, e.turno, ca.nombre AS canal_nombre,
       e.codigo_estudiante, e.nombres, e.apellidos, e.dni, e.fecha_nacimiento, e.telefono, e.correo, e.direccion,
       e.estado, u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e INNER JOIN Usuario u ON u.id = e.usuario_id
@@ -57,7 +57,7 @@ export class EstudianteRepository {
    * Busca un estudiante por DNI
    */
   async findByDni(dni: string): Promise<EstudianteConUsuario | null> {
-    const query = `SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante,
+    const query = `SELECT e.id, e.usuario_id, e.canal_id, e.turno, ca.nombre AS canal_nombre, e.codigo_estudiante,
       e.nombres, e.apellidos, e.dni, e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
       u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e INNER JOIN Usuario u ON u.id = e.usuario_id
@@ -103,6 +103,7 @@ export class EstudianteRepository {
       correo?: string;
       direccion?: string;
       canal_id?: number;
+      turno: 'MANANA' | 'TARDE';
       codigo_estudiante: string;
     }
   ): Promise<number> {
@@ -119,11 +120,12 @@ export class EstudianteRepository {
 
       // 2. Crear perfil de estudiante
       const [estudianteResult] = await conn.execute<ResultSetHeader>(
-        `INSERT INTO Estudiante (usuario_id, canal_id, codigo_estudiante, nombres, apellidos, dni, fecha_nacimiento, telefono, correo, direccion, estado)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO')`,
+        `INSERT INTO Estudiante (usuario_id, canal_id, turno, codigo_estudiante, nombres, apellidos, dni, fecha_nacimiento, telefono, correo, direccion, estado)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO')`,
         [
           usuarioId,
           data.canal_id ?? null,
+          data.turno,
           data.codigo_estudiante,
           data.nombres.trim(),
           data.apellidos.trim(),
@@ -199,7 +201,7 @@ export class EstudianteRepository {
       }
       const fields: string[] = [];
       const values: (string | number | null)[] = [];
-      for (const key of ['nombres', 'apellidos', 'dni', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'canal_id'] as const) {
+    for (const key of ['nombres', 'apellidos', 'dni', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'canal_id', 'turno'] as const) {
         if (data[key] !== undefined) {
           fields.push(`${key} = ?`);
           const value = data[key];
