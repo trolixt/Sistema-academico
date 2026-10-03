@@ -185,8 +185,8 @@ export class AcademicoController {
   getGruposMe = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const filters = req.user?.rol === 'DOCENTE'
-        ? { docente_id: req.user.perfil_id }
-        : { estudiante_id: req.user!.perfil_id };
+        ? { docente_id: req.user.perfil_id, soloActivos: true }
+        : { estudiante_id: req.user!.perfil_id, soloActivos: true };
       res.status(200).json({ success: true, data: await this.service.getGrupos(filters) });
     } catch (error) { next(error); }
   };

@@ -22,6 +22,7 @@ export class AsistenciaRepository {
       FROM Horario h INNER JOIN Grupo g ON g.id = h.grupo_id
       INNER JOIN CicloAcademico ca ON ca.id = g.ciclo_id
       WHERE h.grupo_id = ?
+        AND g.estado = 'ACTIVO'
         AND h.dia_semana = CASE DAYOFWEEK(?) WHEN 1 THEN 'DOMINGO' WHEN 2 THEN 'LUNES' WHEN 3 THEN 'MARTES' WHEN 4 THEN 'MIERCOLES' WHEN 5 THEN 'JUEVES' WHEN 6 THEN 'VIERNES' WHEN 7 THEN 'SABADO' END
         AND COALESCE(h.fecha_inicio, ca.fecha_inicio) <= ?
         AND COALESCE(h.fecha_fin, ca.fecha_fin) >= ?
