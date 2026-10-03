@@ -32,7 +32,7 @@ export function DashboardPage() {
   }, [token, usuario]);
 
   return <div className="dashboard-page">
-    <div className="page-intro"><div><span className="eyebrow">INFORMACIÓN REGISTRADA</span><h2>Resumen académico</h2><p>Los indicadores se calculan con los registros disponibles en la base de datos.</p></div><span className="data-source-badge"><i /> Fuente: MySQL</span></div>
+    <div className="page-intro"><div><span className="eyebrow">INFORMACIÓN REGISTRADA</span><h2>Resumen académico</h2><p>Los indicadores se calculan con los registros disponibles en la base de datos.</p></div></div>
     {error && <div className="alert error">{error}</div>}
     <div className="metric-grid">{loading ? <div className="panel-loading">Consultando los registros…</div> : metrics.map((metric) => <article className="metric-card" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.description}</small></article>)}</div>
     <section className="dashboard-table-section"><div className="section-heading"><div><h3>Registros recientes</h3><p>Ordenados por la fecha disponible en la base de datos.</p></div></div>
