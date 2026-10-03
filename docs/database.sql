@@ -5,6 +5,7 @@ USE sistemaacademia;
 
 CREATE TABLE IF NOT EXISTS Usuario (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    id_acceso CHAR(9) NOT NULL UNIQUE,
     nombre_usuario VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     rol ENUM(
@@ -18,6 +19,57 @@ CREATE TABLE IF NOT EXISTS Usuario (
         'INACTIVO'
     ) DEFAULT 'ACTIVO'
 ) ENGINE=InnoDB;
+
+SET @tiene_id_acceso = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Usuario' AND COLUMN_NAME = 'id_acceso'
+);
+SET @ddl_id_acceso = IF(@tiene_id_acceso = 0,
+    'ALTER TABLE Usuario ADD COLUMN id_acceso CHAR(9) NULL AFTER id', 'SELECT 1');
+PREPARE stmt_id_acceso FROM @ddl_id_acceso;
+EXECUTE stmt_id_acceso;
+DEALLOCATE PREPARE stmt_id_acceso;
+
+UPDATE Usuario
+SET id_acceso = CONCAT(
+    CASE rol
+        WHEN 'ESTUDIANTE' THEN '00'
+        WHEN 'DOCENTE' THEN '10'
+        WHEN 'ADMINISTRATIVO' THEN '20'
+        ELSE '90'
+    END,
+    LPAD(id, 7, '0')
+)
+WHERE id_acceso IS NULL;
+
+UPDATE Usuario
+SET id_acceso = CONCAT(
+    CASE rol
+        WHEN 'ESTUDIANTE' THEN '00'
+        WHEN 'DOCENTE' THEN '10'
+        WHEN 'ADMINISTRATIVO' THEN '20'
+        ELSE '90'
+    END,
+    LPAD(id, 7, '0')
+)
+WHERE LEFT(id_acceso, 2) <> CASE rol
+    WHEN 'ESTUDIANTE' THEN '00'
+    WHEN 'DOCENTE' THEN '10'
+    WHEN 'ADMINISTRATIVO' THEN '20'
+    ELSE '90'
+END;
+
+ALTER TABLE Usuario MODIFY COLUMN id_acceso CHAR(9) NOT NULL;
+
+SET @tiene_indice_id_acceso = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Usuario' AND COLUMN_NAME = 'id_acceso' AND NON_UNIQUE = 0
+);
+SET @ddl_indice_id_acceso = IF(@tiene_indice_id_acceso = 0,
+    'ALTER TABLE Usuario ADD CONSTRAINT uq_usuario_id_acceso UNIQUE (id_acceso)', 'SELECT 1');
+PREPARE stmt_indice_id_acceso FROM @ddl_indice_id_acceso;
+EXECUTE stmt_indice_id_acceso;
+DEALLOCATE PREPARE stmt_indice_id_acceso;
 
 CREATE TABLE IF NOT EXISTS Administrador (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -369,14 +421,12 @@ CREATE TABLE IF NOT EXISTS ResultadoSimulacro (
     CONSTRAINT chk_resultado_simulacro_puntaje CHECK (puntaje BETWEEN 0 AND 600)
 ) ENGINE=InnoDB;
 
-DROP TABLE IF EXISTS DetalleNota;
-DROP TABLE IF EXISTS EvaluacionNotas;
 
-INSERT IGNORE INTO Usuario (id, nombre_usuario, password_hash, rol, estado) VALUES
-(1, 'admin', '$2a$10$5ERV8Z9RSiMA1P77gpbM..nwMfCjuS9UMPzMA4MVLuN7MRVGXmbce', 'ADMINISTRADOR', 'ACTIVO'),
-(2, 'secretaria', '$2a$10$nEO948vCeaJshe/BrYAaj.Jo6yJdVWjbIXXNRHjt3ce24GdSb2dVy', 'ADMINISTRATIVO', 'ACTIVO'),
-(3, 'docente', '$2a$10$d0MGr917RIFCK85yACaPbeziNpjvd.itLPxzdEI140gwKeCF.Pjwe', 'DOCENTE', 'ACTIVO'),
-(4, 'estudiante', '$2a$10$Y/flIjwbTC6A8IaHwL6pdOUS/zI7zkNQmjf2I./MD59UzUqnZcwr6', 'ESTUDIANTE', 'ACTIVO');
+INSERT IGNORE INTO Usuario (id, id_acceso, nombre_usuario, password_hash, rol, estado) VALUES
+(1, '900000001', 'admin', '$2a$10$5ERV8Z9RSiMA1P77gpbM..nwMfCjuS9UMPzMA4MVLuN7MRVGXmbce', 'ADMINISTRADOR', 'ACTIVO'),
+(2, '201928374', 'secretaria', '$2a$10$nEO948vCeaJshe/BrYAaj.Jo6yJdVWjbIXXNRHjt3ce24GdSb2dVy', 'ADMINISTRATIVO', 'ACTIVO'),
+(3, '102938476', 'docente', '$2a$10$d0MGr917RIFCK85yACaPbeziNpjvd.itLPxzdEI140gwKeCF.Pjwe', 'DOCENTE', 'ACTIVO'),
+(4, '001609191', 'estudiante', '$2a$10$Y/flIjwbTC6A8IaHwL6pdOUS/zI7zkNQmjf2I./MD59UzUqnZcwr6', 'ESTUDIANTE', 'ACTIVO');
 
 INSERT IGNORE INTO Administrador (id, usuario_id, nombres, apellidos, dni, correo) VALUES
 (1, 1, 'Alejandro', 'Torres', '70000001', 'admin@althea.edu');
@@ -384,9 +434,9 @@ INSERT IGNORE INTO PersonalAdministrativo (id, usuario_id, nombres, apellidos, d
 (1, 2, 'Lucía', 'Mendoza', '70000002', 'lucia@althea.edu');
 INSERT IGNORE INTO Docente (id, usuario_id, codigo_docente, nombres, apellidos, dni, telefono, correo) VALUES
 (1, 3, 'DOC-0001', 'Carlos', 'Ramírez', '70000003', '999111222', 'carlos.ramirez@althea.edu');
-INSERT IGNORE INTO Usuario (id, nombre_usuario, password_hash, rol, estado) VALUES
-(5, 'diego', '$2a$10$Y/flIjwbTC6A8IaHwL6pdOUS/zI7zkNQmjf2I./MD59UzUqnZcwr6', 'ESTUDIANTE', 'ACTIVO'),
-(6, 'valeria', '$2a$10$Y/flIjwbTC6A8IaHwL6pdOUS/zI7zkNQmjf2I./MD59UzUqnZcwr6', 'ESTUDIANTE', 'ACTIVO');
+INSERT IGNORE INTO Usuario (id, id_acceso, nombre_usuario, password_hash, rol, estado) VALUES
+(5, '009371842', 'diego', '$2a$10$Y/flIjwbTC6A8IaHwL6pdOUS/zI7zkNQmjf2I./MD59UzUqnZcwr6', 'ESTUDIANTE', 'ACTIVO'),
+(6, '007241039', 'valeria', '$2a$10$Y/flIjwbTC6A8IaHwL6pdOUS/zI7zkNQmjf2I./MD59UzUqnZcwr6', 'ESTUDIANTE', 'ACTIVO');
 INSERT IGNORE INTO Estudiante (id, usuario_id, codigo_estudiante, nombres, apellidos, dni, fecha_nacimiento, telefono, correo, direccion, estado) VALUES
 (1, 4, 'EST-0001', 'Mariana', 'Salazar', '70000004', '2005-06-14', '999111333', 'mariana.salazar@correo.pe', 'Lima', 'ACTIVO'),
 (2, 5, 'EST-0002', 'Diego', 'Quispe', '70000005', '2004-02-21', '999111334', 'diego.quispe@correo.pe', 'Lima', 'ACTIVO'),

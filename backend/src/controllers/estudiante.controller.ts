@@ -44,8 +44,8 @@ export class EstudianteController {
 
   getByEitherId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const id = Number(req.params.id);
-      if (!Number.isInteger(id) || id < 1) {
+      const id = String(req.params.id);
+      if (!/^\d{1,9}$/.test(id)) {
         res.status(400).json({ success: false, message: 'Ingresa un ID numérico válido' });
         return;
       }

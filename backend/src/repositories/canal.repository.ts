@@ -26,7 +26,7 @@ export class CanalRepository {
 
   async findStudents(canalId: number) {
     const [rows] = await pool.execute<RowDataPacket[]>(`SELECT DISTINCT e.id, e.usuario_id, e.codigo_estudiante, e.nombres, e.apellidos,
-      e.dni, e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado, u.nombre_usuario, u.estado AS estado_usuario
+      e.dni, e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado, u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e INNER JOIN Usuario u ON u.id = e.usuario_id
       WHERE e.canal_id = ? AND e.estado = 'ACTIVO' AND u.estado = 'ACTIVO'
       ORDER BY e.apellidos, e.nombres`, [canalId]);

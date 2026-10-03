@@ -1,6 +1,7 @@
 import pool from '../config/database';
 import { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
 import { EstudianteConUsuario, CreateEstudianteDTO, UpdateEstudianteDTO, EstadoUsuario } from '../types';
+import { generarIdAcceso } from '../utils/id-acceso';
 
 export class EstudianteRepository {
 
@@ -11,7 +12,7 @@ export class EstudianteRepository {
     const query = `
       SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
              e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
-             u.nombre_usuario, u.estado AS estado_usuario
+             u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e
       INNER JOIN Usuario u ON e.usuario_id = u.id
       LEFT JOIN Canal ca ON ca.id = e.canal_id
@@ -29,7 +30,7 @@ export class EstudianteRepository {
     const query = `
       SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
              e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
-             u.nombre_usuario, u.estado AS estado_usuario
+             u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e
       INNER JOIN Usuario u ON e.usuario_id = u.id
       LEFT JOIN Canal ca ON ca.id = e.canal_id
@@ -41,14 +42,14 @@ export class EstudianteRepository {
     return rows[0] as EstudianteConUsuario;
   }
 
-  async findByEitherId(id: number): Promise<EstudianteConUsuario[]> {
+  async findByEitherId(id: string): Promise<EstudianteConUsuario[]> {
     const [rows] = await pool.execute<RowDataPacket[]>(`SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre,
       e.codigo_estudiante, e.nombres, e.apellidos, e.dni, e.fecha_nacimiento, e.telefono, e.correo, e.direccion,
-      e.estado, u.nombre_usuario, u.estado AS estado_usuario
+      e.estado, u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e INNER JOIN Usuario u ON u.id = e.usuario_id
       LEFT JOIN Canal ca ON ca.id = e.canal_id
-      WHERE e.id = ? OR e.usuario_id = ?
-      ORDER BY CASE WHEN e.id = ? THEN 0 ELSE 1 END`, [id, id, id]);
+      WHERE e.id = ? OR u.id = ? OR u.id_acceso = ?
+      ORDER BY CASE WHEN e.id = ? THEN 0 ELSE 1 END`, [id, id, id, id]);
     return rows as EstudianteConUsuario[];
   }
 
@@ -58,7 +59,7 @@ export class EstudianteRepository {
   async findByDni(dni: string): Promise<EstudianteConUsuario | null> {
     const query = `SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante,
       e.nombres, e.apellidos, e.dni, e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
-      u.nombre_usuario, u.estado AS estado_usuario
+      u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e INNER JOIN Usuario u ON u.id = e.usuario_id
       LEFT JOIN Canal ca ON ca.id = e.canal_id WHERE e.dni = ? LIMIT 1`;
     const [rows] = await pool.execute<RowDataPacket[]>(query, [dni]);
@@ -111,8 +112,8 @@ export class EstudianteRepository {
 
       // 1. Crear cuenta de usuario
       const [userResult] = await conn.execute<ResultSetHeader>(
-        `INSERT INTO Usuario (nombre_usuario, password_hash, rol, estado) VALUES (?, ?, 'ESTUDIANTE', 'ACTIVO')`,
-        [data.nombre_usuario, data.password_hash]
+        `INSERT INTO Usuario (id_acceso, nombre_usuario, password_hash, rol, estado) VALUES (?, ?, ?, 'ESTUDIANTE', 'ACTIVO')`,
+        [generarIdAcceso('ESTUDIANTE'), data.nombre_usuario, data.password_hash]
       );
       const usuarioId = userResult.insertId;
 

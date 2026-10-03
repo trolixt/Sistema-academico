@@ -9,6 +9,7 @@ import {
   PerfilUsuario,
   RolUsuario
 } from '../types';
+import { generarIdAcceso } from '../utils/id-acceso';
 
 export class UsuarioRepository {
   async findAllSafe(rol?: RolUsuario) {
@@ -16,7 +17,7 @@ export class UsuarioRepository {
     let filter = "WHERE u.estado = 'ACTIVO'";
     if (rol) { filter += ' AND u.rol = ?'; params.push(rol); }
     const [rows] = await pool.execute<RowDataPacket[]>(`
-      SELECT u.id, u.nombre_usuario, u.rol, u.estado,
+      SELECT u.id, u.id_acceso, u.nombre_usuario, u.rol, u.estado,
         COALESCE(a.nombres, pa.nombres, d.nombres, e.nombres) AS nombres,
         COALESCE(a.apellidos, pa.apellidos, d.apellidos, e.apellidos) AS apellidos,
         COALESCE(a.correo, pa.correo, d.correo, e.correo) AS correo,
@@ -33,9 +34,9 @@ export class UsuarioRepository {
     return rows;
   }
 
-  async findAccountSafeById(id: number) {
+  async findAccountSafeById(id: string | number) {
     const [rows] = await pool.execute<RowDataPacket[]>(`
-      SELECT u.id, u.nombre_usuario, u.rol, u.estado,
+      SELECT u.id, u.id_acceso, u.nombre_usuario, u.rol, u.estado,
         COALESCE(a.nombres, pa.nombres, d.nombres, e.nombres) AS nombres,
         COALESCE(a.apellidos, pa.apellidos, d.apellidos, e.apellidos) AS apellidos,
         COALESCE(a.correo, pa.correo, d.correo, e.correo) AS correo,
@@ -46,8 +47,9 @@ export class UsuarioRepository {
       LEFT JOIN PersonalAdministrativo pa ON pa.usuario_id = u.id
       LEFT JOIN Docente d ON d.usuario_id = u.id
       LEFT JOIN Estudiante e ON e.usuario_id = u.id
-      WHERE u.id = ? LIMIT 1
-    `, [id]);
+      WHERE u.id_acceso = ? OR u.id = ?
+      ORDER BY CASE WHEN u.id_acceso = ? THEN 0 ELSE 1 END LIMIT 1
+    `, [String(id), Number(id), String(id)]);
     return rows[0] || null;
   }
 
@@ -56,8 +58,8 @@ export class UsuarioRepository {
     try {
       await connection.beginTransaction();
       const [userResult] = await connection.execute<ResultSetHeader>(
-        `INSERT INTO Usuario (nombre_usuario, password_hash, rol, estado) VALUES (?, ?, 'ADMINISTRATIVO', 'ACTIVO')`,
-        [`SECRETARIA-${data.dni}`, data.password_hash]
+        `INSERT INTO Usuario (id_acceso, nombre_usuario, password_hash, rol, estado) VALUES (?, ?, ?, 'ADMINISTRATIVO', 'ACTIVO')`,
+        [generarIdAcceso('ADMINISTRATIVO'), `SECRETARIA-${data.dni}`, data.password_hash]
       );
       const userId = userResult.insertId;
       await connection.execute(
@@ -132,7 +134,7 @@ export class UsuarioRepository {
    */
   async findByNombreUsuario(nombreUsuario: string): Promise<IUsuario | null> {
     const query = `
-      SELECT id, nombre_usuario, password_hash, rol, estado
+      SELECT id, id_acceso, nombre_usuario, password_hash, rol, estado
       FROM Usuario
       WHERE nombre_usuario = ?
       LIMIT 1
@@ -151,7 +153,7 @@ export class UsuarioRepository {
    */
   async findById(id: number): Promise<IUsuario | null> {
     const query = `
-      SELECT id, nombre_usuario, password_hash, rol, estado
+      SELECT id, id_acceso, nombre_usuario, password_hash, rol, estado
       FROM Usuario
       WHERE id = ?
       LIMIT 1
@@ -163,6 +165,14 @@ export class UsuarioRepository {
     }
 
     return rows[0] as IUsuario;
+  }
+
+  async findByAccessId(idAcceso: string): Promise<IUsuario | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>(
+      'SELECT id, id_acceso, nombre_usuario, password_hash, rol, estado FROM Usuario WHERE id_acceso = ? LIMIT 1',
+      [idAcceso]
+    );
+    return rows.length ? rows[0] as IUsuario : null;
   }
 
   /**
@@ -201,10 +211,10 @@ export class UsuarioRepository {
    */
   async create(nombreUsuario: string, passwordHash: string, rol: RolUsuario): Promise<number> {
     const query = `
-      INSERT INTO Usuario (nombre_usuario, password_hash, rol, estado)
-      VALUES (?, ?, ?, 'ACTIVO')
+      INSERT INTO Usuario (id_acceso, nombre_usuario, password_hash, rol, estado)
+      VALUES (?, ?, ?, ?, 'ACTIVO')
     `;
-    const [result] = await pool.execute<ResultSetHeader>(query, [nombreUsuario, passwordHash, rol]);
+    const [result] = await pool.execute<ResultSetHeader>(query, [generarIdAcceso(rol), nombreUsuario, passwordHash, rol]);
     return result.insertId;
   }
 

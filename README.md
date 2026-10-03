@@ -1,46 +1,84 @@
-# Sistema académico
+# Sistema académico preuniversitario
 
-Aplicación web separada en frontend Next.js, API Express y base de datos MySQL. Las pantallas obtienen registros e indicadores a través de la API; el navegador no contiene conjuntos de datos de ejemplo ni cifras académicas fijas.
+## Propósito
 
-## Estructura
+Aplicación web para administrar una academia preuniversitaria: canales de estudio, estudiantes, docentes, matrícula, pagos, asistencia por curso y resultados de exámenes simulacro. La interfaz se divide en áreas según el rol de la cuenta.
 
-```text
-backend/
-  src/
-    config/                     Conexión, configuración y seed
-    controllers/                Controladores HTTP
-    middlewares/                Autenticación, roles y errores
-    repositories/               Consultas SQL y persistencia
-    routes/                     Rutas REST por dominio
-    services/                   Validación y reglas de negocio
-    types/                      Tipos de API
-frontend/
-  src/
-    app/                        Rutas y layouts de Next.js App Router
-    components/                 Elementos compartidos y sesión
-    features/                   Pantallas organizadas por función
-    lib/                        Cliente API y permisos de navegación
-    styles/                     Estilos globales
-    types/                      Tipos del frontend
-docs/
-  database.sql                  Esquema y datos iniciales para MySQL
-  CREDENCIALES_DEMO.txt         Cuentas locales de demostración
-  *.md                          Requisitos y documentación del sistema
-  referencias/figma/            Referencias visuales únicamente; nunca código ejecutable
-```
+## Componentes y ejecución
 
-Los diseños de Figma son guía visual. No se ejecutan ni se importan desde la aplicación; las pantallas funcionales viven en `frontend/src/app` y `frontend/src/features`. La configuración de Figma Make se retiró del frontend porque correspondía a un flujo Vite/Figma separado de este proyecto Next.js.
+- `frontend/`: aplicación web Next.js.
+- `backend/`: API Express con TypeScript.
+- `docs/database.sql`: esquema, datos demo y actualización compatible del esquema existente.
+- La API usa MySQL y lee sus datos de conexión de `backend/.env`.
+- Configuración de referencia: `backend/.env.example`. Copiarla como `backend/.env` y completar las variables localmente. No guardar el archivo `.env` en el repositorio ni en documentación compartida.
+- API local: `http://localhost:4000/api`; verificación: `GET /api/health`.
+- Frontend local: `http://localhost:8443`.
+- Comandos del backend: `npm run dev`, `npm run build`, `npm start`, `npm run seed`.
+- Comandos del frontend: `npm run dev`, `npm run lint`, `npm run build`.
 
-## Ejecución local
+## Configuración de base de datos
 
-1. Crea la base MySQL e importa `docs/database.sql`.
-2. Copia `backend/.env.example` a `backend/.env` y configura MySQL, JWT y CORS.
-3. En `backend/`, ejecuta `npm install` y luego `npm run dev`.
-4. Copia `frontend/.env.example` a `frontend/.env.local` si la API no usa `http://localhost:4000/api`.
-5. En `frontend/`, ejecuta `pnpm install` y luego `pnpm dev`.
+`backend/src/config/database.ts` carga `backend/.env` y usa `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` y `DB_NAME`, sin credenciales alternativas escritas en el código. Las cinco variables deben existir; `DB_PASSWORD` puede estar vacía en un entorno local si el servidor MySQL no usa contraseña. `DB_PORT` debe ser un puerto válido.
 
-La API usa el puerto 4000 de forma predeterminada y Next.js el puerto 8443. `docs/CREDENCIALES_DEMO.txt` lista las cuentas de demostración incluidas en el SQL inicial; cambia esas contraseñas antes de publicar el sistema.
+También se utilizan `PORT`, `FRONTEND_URL`, `JWT_SECRET` y `JWT_EXPIRES_IN` para el servidor, CORS y sesiones. Configura un `JWT_SECRET` aleatorio y privado para cada entorno. Cambia las contraseñas de demostración antes de cargar información real.
 
-## Flujo de datos
+## Acceso y cuentas
 
-El frontend inicia sesión contra `/api/auth/login` y envía el token a las rutas protegidas. Las páginas consultan la API para leer y guardar información. Los indicadores se calculan usando filas devueltas por la API y los formularios guardan mediante endpoints; la autorización por rol y las reglas de negocio viven en el backend.
+El acceso se realiza con un ID de acceso único de nueve dígitos y contraseña. Los IDs comienzan con 00 para estudiantes, 10 para docentes, 20 para secretaría y 90 para administración; los siete dígitos restantes se generan automáticamente. Este código (`Usuario.id_acceso`) es independiente del ID interno (`Usuario.id`) usado por las relaciones de la base de datos. El servidor verifica la contraseña contra su hash bcrypt y entrega una sesión JWT. Los roles del sistema son:
+
+- **ADMINISTRADOR**: administración completa; consulta y gestión de cuentas y áreas, personas, canales, grupos, horarios, matrícula, pagos, asistencia y simulacros.
+- **ADMINISTRATIVO** (secretaría): operaciones de atención y matrícula permitidas por las rutas; no tiene los permisos generales del administrador.
+- **DOCENTE**: consulta de cursos/grupos asignados y gestión de asistencia de sus clases.
+- **ESTUDIANTE**: consulta de sus propios datos académicos, cursos, asistencias, pagos y resultados de simulacros.
+
+Las contraseñas no se guardan en texto plano en la base de datos. El administrador puede restablecer contraseñas y gestionar estados de cuenta. La cuenta inactiva queda fuera de los listados normales. Para encontrarla y reincorporarla se debe conocer su ID; el DNI ayuda a reconocer datos previos, pero no sustituye ese ID. Desactivar una cuenta conserva el historial. Al retirar un estudiante, se cierran sus matrículas activas o pendientes; una reincorporación genera una nueva matrícula para el periodo correspondiente.
+
+Las cuentas reciben nueve dígitos: `00` para estudiantes, `10` para docentes, `20` para secretaría y `90` para administración, seguidos por siete dígitos generados al azar. En estudiantes y docentes, si no se define una contraseña inicial, el DNI se usa como contraseña inicial. En secretaría, se solicita una contraseña. Comunicar la contraseña inicial de forma segura y cambiarla después del primer acceso.
+
+## Estructura académica
+
+Hay cuatro canales fijos. Cada estudiante se matricula en un canal y, por pertenecer a él, se asocia a todas las áreas configuradas para ese canal.
+
+1. **Canal 1 — Ciencias de la Salud y Biomédicas:** Biología, Anatomía, Química, Razonamiento Matemático, Razonamiento Verbal, Física y Lenguaje.
+2. **Canal 2 — Ciencias Exactas e Ingenierías:** Álgebra, Geometría, Trigonometría, Aritmética, Física, Química, Razonamiento Matemático y Razonamiento Verbal.
+3. **Canal 3 — Ciencias Sociales, Letras y Humanidades:** Lenguaje y Literatura, Historia (del Perú y Universal), Geografía, Economía, Educación Cívica, Filosofía y Psicología, Razonamiento Verbal y Razonamiento Matemático.
+4. **Canal 4 — Ciencias Empresariales y Actuariales:** Economía, Aritmética, Álgebra, Razonamiento Matemático, Razonamiento Verbal, Lenguaje, Historia y Geografía.
+
+El administrador puede editar la información y las áreas de cada canal, además de organizar docentes, grupos y horarios. Una cuenta docente puede ser desactivada si no conserva grupos activos; reasignar esos grupos permite completar la desactivación.
+
+## Estudiantes y matrícula
+
+La ficha del estudiante reúne datos personales, canal, áreas/cursos, asistencia, resultados de simulacros y situación de matrícula. La búsqueda administrativa lista estudiantes activos; el administrador puede buscar por ID para consultar una cuenta inactiva. Si se detecta un DNI previamente registrado, el flujo ofrece reincorporar los datos existentes usando el ID correcto, en lugar de crear otro registro con el mismo DNI.
+
+La matrícula se realiza por canal. Se conserva el flujo existente de pagos con sus cuotas del periodo, fechas e importes. Los pagos se vinculan a la matrícula y se consultan desde las vistas de administración y del estudiante según el rol.
+
+## Asistencia
+
+Las marcas posibles son presente, tardanza, falta y justificado. Para el porcentaje de cada estudiante en cada curso, presente aporta 2 puntos al numerador y 2 al denominador; tardanza aporta 1 y 2; falta aporta 0 y 2; justificado no suma numerador ni denominador. El porcentaje es `puntos obtenidos / puntos computables × 100`. Por ejemplo, presente, tardanza, falta, presente y falta justificada dan `5/8 = 62.5%`. En la vista se muestra el porcentaje; el detalle de marcas puede ser consultado por quienes tengan permiso.
+
+La asistencia se registra por sesión/grupo. El horario asignado al grupo determina las sesiones esperadas; una sesión justificada no penaliza el porcentaje.
+
+## Exámenes simulacro
+
+El administrador puede crear simulacros por canal y registrar los puntajes por estudiante. El puntaje máximo previsto es 600 puntos. El estudiante puede consultar sus propios resultados, y el administrador puede revisar el historial individual.
+
+## Datos principales
+
+El esquema SQL documenta las tablas. Conceptualmente incluye:
+
+- `Usuario` y perfiles específicos (`Administrador`, `PersonalAdministrativo`, `Docente`, `Estudiante`) para acceso y datos personales.
+- `Canal`, `Curso`/área y sus asociaciones para la oferta académica.
+- ciclos, grupos y horarios para asignaciones docentes y programación.
+- matrícula y pagos para inscripción y seguimiento de cuotas.
+- sesiones y detalle de asistencia por estudiante.
+- simulacros y resultados por estudiante.
+
+Usa `docs/database.sql` como script único para crear o actualizar el esquema. Incluye canales, matrículas por canal, IDs de acceso con prefijo, pagos y datos iniciales de demostración. Haz una copia de seguridad antes de aplicarlo a una base existente. El script no se ejecuta automáticamente al iniciar la aplicación.
+
+## Seguridad y operación
+
+- Mantén `backend/.env` fuera de Git y limita quién puede leerlo.
+- No copies contraseñas de base de datos, secretos JWT ni datos personales reales a los documentos de `docs`.
+- `docs/CREDENCIALES_DEMO.txt` contiene solo las credenciales de cuentas ficticias insertadas por el SQL de demostración; no representa las cuentas existentes en una base de datos de producción.
+- Antes de usar el sistema con datos reales, cambia las claves demo, define secretos fuertes, verifica permisos MySQL y configura copias de seguridad.
+- Las cuentas activas reales se consultan en la sección de administración; sus contraseñas no se pueden recuperar porque se almacenan como hashes. Usa el restablecimiento de contraseña.

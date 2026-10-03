@@ -2,36 +2,36 @@ CREDENCIALES DE DEMOSTRACIÓN — SA-studios
 ========================================
 
 Estas cuentas ficticias corresponden a las filas insertadas en
-docs/database.sql. Para ingresar se usa el ID de acceso (Usuario.id) y la
+docs/database.sql. Para ingresar se usa el ID de acceso (Usuario.id_acceso) y la
 contraseña; el nombre de usuario que aparece entre paréntesis solo sirve para
 identificar la cuenta en el SQL.
 
-ID de acceso: 1
+ID de acceso: 900000001
 Rol: Administrador
 Contraseña: Admin2026*
 Usuario de referencia: admin
 
-ID de acceso: 2
+ID de acceso: 201928374
 Rol: Secretaría (ADMINISTRATIVO)
 Contraseña: Administrativo2026*
 Usuario de referencia: secretaria
 
-ID de acceso: 3
+ID de acceso: 102938476
 Rol: Docente
 Contraseña: Docente2026*
 Usuario de referencia: docente
 
-ID de acceso: 4
+ID de acceso: 001609191
 Rol: Estudiante — Mariana Salazar
 Contraseña: Estudiante2026*
 Usuario de referencia: estudiante
 
-ID de acceso: 5
+ID de acceso: 009371842
 Rol: Estudiante — Diego Quispe
 Contraseña: Estudiante2026*
 Usuario de referencia: diego
 
-ID de acceso: 6
+ID de acceso: 007241039
 Rol: Estudiante — Valeria Mendoza
 Contraseña: Estudiante2026*
 Usuario de referencia: valeria
@@ -41,9 +41,9 @@ Configuración local
 API: http://localhost:4000/api
 Frontend: http://localhost:8443
 
-El comando npm run seed crea una cuenta administradora solo si no encuentra
+El comando npm run seed crea una cuenta administradora con prefijo 90 y siete dígitos aleatorios solo si no encuentra
 un usuario con nombre de referencia "admin". La contraseña inicial es
-Admin2026* y el script muestra el ID generado. Si el usuario ya existe, el
+Admin2026* y el script muestra el ID de acceso generado. Si el usuario ya existe, el
 script muestra su ID y no cambia su contraseña.
 
 Este archivo no enumera cuentas de bases de datos activas o productivas. Las

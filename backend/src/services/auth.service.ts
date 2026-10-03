@@ -23,15 +23,15 @@ export class AuthService {
    * Autentica a un usuario y genera su token JWT con su perfil correspondiente
    */
   async login(credentials: LoginDTO): Promise<LoginResponseDTO> {
-    const { id_usuario, password } = credentials;
+    const { id_acceso, password } = credentials;
 
-    if (!id_usuario || !password || !/^\d+$/.test(String(id_usuario).trim())) {
-      const error: any = new Error('El ID y la contraseña son requeridos');
+    if (!id_acceso || !password || !/^\d{9}$/.test(String(id_acceso).trim())) {
+      const error: any = new Error('Ingresa tu ID de acceso de 9 dígitos y contraseña');
       error.statusCode = 400;
       throw error;
     }
 
-    const usuario = await this.userRepo.findById(Number(id_usuario));
+    const usuario = await this.userRepo.findByAccessId(String(id_acceso).trim());
     if (!usuario) {
       const error: any = new Error('Credenciales inválidas');
       error.statusCode = 401;
@@ -70,6 +70,7 @@ export class AuthService {
 
     const usuarioAutenticado: UsuarioAutenticado = {
       id: usuario.id,
+      id_acceso: usuario.id_acceso,
       nombre_usuario: usuario.nombre_usuario,
       rol: usuario.rol,
       estado: usuario.estado,
@@ -103,6 +104,7 @@ export class AuthService {
 
     return {
       id: usuario.id,
+      id_acceso: usuario.id_acceso,
       nombre_usuario: usuario.nombre_usuario,
       rol: usuario.rol,
       estado: usuario.estado,

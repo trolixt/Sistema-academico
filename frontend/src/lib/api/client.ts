@@ -20,11 +20,11 @@ export async function apiRequest<T>(path: string, token: string, init: RequestIn
   return payload.data;
 }
 
-export async function loginRequest(id_usuario: string, password: string) {
+export async function loginRequest(id_acceso: string, password: string) {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id_usuario, password }),
+    body: JSON.stringify({ id_acceso, password }),
     cache: "no-store",
   });
   const payload = await response.json();

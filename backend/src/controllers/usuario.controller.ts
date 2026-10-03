@@ -24,7 +24,11 @@ export class UsuarioController {
    */
   getById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const id = Number(req.params.id);
+      const id = String(req.params.id);
+      if (!/^\d{1,9}$/.test(id)) {
+        res.status(400).json({ success: false, message: 'Ingresa un ID numérico válido' });
+        return;
+      }
       const usuario = await this.service.getUsuarioById(id);
       res.status(200).json({ success: true, data: usuario });
     } catch (error) {

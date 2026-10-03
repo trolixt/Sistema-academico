@@ -52,7 +52,7 @@ export class EstudianteService {
     return this.repo.findByDni(dni.trim());
   }
 
-  async getEstudianteByEitherId(id: number): Promise<EstudianteConUsuario> {
+  async getEstudianteByEitherId(id: string): Promise<EstudianteConUsuario> {
     const matches = await this.repo.findByEitherId(id);
     if (matches.length > 1) {
       const error: any = new Error('Ese número coincide con el ID de ficha y el ID de acceso de estudiantes distintos; usa el ID de ficha mostrado en el directorio');

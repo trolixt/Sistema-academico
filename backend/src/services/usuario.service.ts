@@ -17,7 +17,7 @@ export class UsuarioService {
   /**
    * Obtiene los datos de un usuario por ID (sin exponer el hash de contraseña)
    */
-  async getUsuarioById(id: number) {
+  async getUsuarioById(id: string | number) {
     const usuario = await this.userRepo.findAccountSafeById(id);
     if (!usuario) {
       const error: any = new Error(`Usuario con ID ${id} no encontrado`);

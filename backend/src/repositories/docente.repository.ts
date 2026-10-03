@@ -1,8 +1,10 @@
 import pool from '../config/database';
 import { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
 import { IDocente, EstadoUsuario } from '../types';
+import { generarIdAcceso } from '../utils/id-acceso';
 
 export interface DocenteConUsuario extends IDocente {
+  id_acceso: string;
   nombre_usuario: string;
   estado_usuario: EstadoUsuario;
 }
@@ -34,7 +36,7 @@ export class DocenteRepository {
   async findAll(): Promise<DocenteConUsuario[]> {
     const query = `
       SELECT d.id, d.usuario_id, d.codigo_docente, d.nombres, d.apellidos, d.dni, d.telefono, d.correo,
-             u.nombre_usuario, u.estado AS estado_usuario
+             u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Docente d
       INNER JOIN Usuario u ON d.usuario_id = u.id
       WHERE u.estado = 'ACTIVO'
@@ -50,7 +52,7 @@ export class DocenteRepository {
   async findById(id: number): Promise<DocenteConUsuario | null> {
     const query = `
       SELECT d.id, d.usuario_id, d.codigo_docente, d.nombres, d.apellidos, d.dni, d.telefono, d.correo,
-             u.nombre_usuario, u.estado AS estado_usuario
+             u.id_acceso, u.nombre_usuario, u.estado AS estado_usuario
       FROM Docente d
       INNER JOIN Usuario u ON d.usuario_id = u.id
       WHERE d.id = ?
@@ -111,8 +113,8 @@ export class DocenteRepository {
       await conn.beginTransaction();
 
       const [userResult] = await conn.execute<ResultSetHeader>(
-        `INSERT INTO Usuario (nombre_usuario, password_hash, rol, estado) VALUES (?, ?, 'DOCENTE', 'ACTIVO')`,
-        [data.nombre_usuario, data.password_hash]
+        `INSERT INTO Usuario (id_acceso, nombre_usuario, password_hash, rol, estado) VALUES (?, ?, ?, 'DOCENTE', 'ACTIVO')`,
+        [generarIdAcceso('DOCENTE'), data.nombre_usuario, data.password_hash]
       );
       const usuarioId = userResult.insertId;
 

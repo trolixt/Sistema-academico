@@ -19,6 +19,7 @@ export type EstadoEvaluacion = 'BORRADOR' | 'PUBLICADA';
 // ==========================================
 export interface IUsuario {
   id: number;
+  id_acceso: string;
   nombre_usuario: string;
   password_hash: string;
   rol: RolUsuario;
@@ -77,12 +78,13 @@ export type PerfilUsuario = IAdministrador | IPersonalAdministrativo | IDocente 
 // DTOs DE AUTENTICACIÓN
 // ==========================================
 export interface LoginDTO {
-  id_usuario: number | string;
+  id_acceso: string;
   password: string;
 }
 
 export interface UsuarioAutenticado {
   id: number;
+  id_acceso: string;
   nombre_usuario: string;
   rol: RolUsuario;
   estado: EstadoUsuario;
@@ -260,6 +262,7 @@ export interface UpdateEstudianteDTO {
 }
 
 export interface EstudianteConUsuario extends IEstudiante {
+  id_acceso: string;
   nombre_usuario: string;
   estado_usuario: EstadoUsuario;
 }

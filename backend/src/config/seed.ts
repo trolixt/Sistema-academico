@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import pool, { testConnection } from './database';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { generarIdAcceso } from '../utils/id-acceso';
 
 async function runSeed() {
   console.log('🌱 [SEED] Iniciando población inicial de la base de datos...');
@@ -18,7 +19,7 @@ async function runSeed() {
 
     // 1. Verificar si ya existe el usuario administrador inicial
     const [existingAdmin] = await pool.execute<RowDataPacket[]>(
-      'SELECT id FROM Usuario WHERE nombre_usuario = ? LIMIT 1',
+      'SELECT id, id_acceso FROM Usuario WHERE nombre_usuario = ? LIMIT 1',
       ['admin']
     );
 
@@ -26,8 +27,8 @@ async function runSeed() {
     if (existingAdmin.length === 0) {
       // Crear Usuario Admin
       const [userResult] = await pool.execute<ResultSetHeader>(
-        'INSERT INTO Usuario (nombre_usuario, password_hash, rol, estado) VALUES (?, ?, ?, ?)',
-        ['admin', passwordHash, 'ADMINISTRADOR', 'ACTIVO']
+        'INSERT INTO Usuario (id_acceso, nombre_usuario, password_hash, rol, estado) VALUES (?, ?, ?, ?, ?)',
+        [generarIdAcceso('ADMINISTRADOR'), 'admin', passwordHash, 'ADMINISTRADOR', 'ACTIVO']
       );
 
       const usuarioId = userResult.insertId;
@@ -40,11 +41,12 @@ async function runSeed() {
       );
 
       console.log('✅ [SEED] Usuario administrador creado con éxito:');
-      console.log('   - ID de acceso:', adminId);
+      const [createdAccount] = await pool.execute<RowDataPacket[]>('SELECT id_acceso FROM Usuario WHERE id = ?', [adminId]);
+      console.log('   - ID de acceso:', createdAccount[0]?.id_acceso);
       console.log('   - Contraseña:', defaultPassword);
       console.log('   - Rol: ADMINISTRADOR');
     } else {
-      console.log('ℹ️ [SEED] El administrador ya existe. ID de acceso:', adminId);
+      console.log('ℹ️ [SEED] El administrador ya existe. ID de acceso:', existingAdmin[0]?.id_acceso);
     }
 
     console.log('✨ [SEED] Proceso finalizado.');
