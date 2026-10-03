@@ -54,8 +54,6 @@ export function ResourcePage({ section }: { section: string }) {
   const [dniMessage, setDniMessage] = useState("");
   const [dniBlocked, setDniBlocked] = useState(false);
   const [dniLookupBusy, setDniLookupBusy] = useState(false);
-  const [pendingRejoinDni, setPendingRejoinDni] = useState("");
-  const [rejoinIdValue, setRejoinIdValue] = useState("");
   const [idLookupStudent, setIdLookupStudent] = useState<Row | null>(null);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
@@ -88,9 +86,9 @@ export function ResourcePage({ section }: { section: string }) {
   const canManage = usuario?.rol === "ADMINISTRADOR" && adminCrudSections.includes(section) && Boolean(config.updatePath);
   const visibleFields = (config.fields || []).filter((field) => section !== "estudiantes" || field.name !== "estado").filter((field) => editingRow ? !field.createOnly : reincorporating ? !field.createOnly && !field.editOnly : !field.editOnly);
 
-  function beginCreate() { setEditingRow(null); setReincorporating(null); setDniMessage(""); setDniBlocked(false); setPendingRejoinDni(""); setRejoinIdValue(""); setError(""); setCreating(true); }
-  function beginEdit(row: Row) { if (section === "estudiantes" && (row.estado !== "ACTIVO" || row.estado_usuario !== "ACTIVO")) { beginReincorporation(row); return; } setEditingRow(row); setReincorporating(null); setPendingRejoinDni(""); setDniMessage(""); setDniBlocked(false); setError(""); setCreating(true); }
-  function beginReincorporation(row: Row) { setEditingRow(null); setReincorporating(row); setPendingRejoinDni(""); setRejoinIdValue(""); setDniMessage("Revisa o actualiza los datos y el canal antes de guardar."); setDniBlocked(false); setError(""); setCreating(true); }
+  function beginCreate() { setEditingRow(null); setReincorporating(null); setDniMessage(""); setDniBlocked(false); setError(""); setCreating(true); }
+  function beginEdit(row: Row) { if (section === "estudiantes" && (row.estado !== "ACTIVO" || row.estado_usuario !== "ACTIVO")) { beginReincorporation(row); return; } setEditingRow(row); setReincorporating(null); setDniMessage(""); setDniBlocked(false); setError(""); setCreating(true); }
+  function beginReincorporation(row: Row) { setEditingRow(null); setReincorporating(row); setDniMessage("Ficha recuperada. Revisa los datos y confirma la reincorporación."); setDniBlocked(false); setError(""); setCreating(true); }
 
   async function lookupStudentDni(raw: string) {
     const dni = raw.trim();
@@ -98,12 +96,10 @@ export function ResourcePage({ section }: { section: string }) {
     setDniLookupBusy(true); setDniMessage(""); setDniBlocked(false);
     try {
       const existing = await apiRequest<Row | null>(`/estudiantes/buscar-dni/${dni}`, token);
-      if (existing?.registro_inactivo) {
-        setPendingRejoinDni(dni);
-        setRejoinIdValue("");
-        setReincorporating(null);
-        setDniBlocked(true);
-        setDniMessage("Ya existe una ficha inactiva. Ingresa el ID del estudiante para verificarla y reincorporarla.");
+      if (existing?.id && (existing.estado !== "ACTIVO" || existing.estado_usuario !== "ACTIVO")) {
+        setReincorporating(existing);
+        setDniBlocked(false);
+        setDniMessage(`Ficha encontrada: ${existing.nombres} ${existing.apellidos}. Se cargaron sus datos; confirma para reincorporarlo.`);
       } else if (existing?.id) {
         if (existing.estado === "ACTIVO" && existing.estado_usuario === "ACTIVO") {
           setReincorporating(null);
@@ -112,29 +108,10 @@ export function ResourcePage({ section }: { section: string }) {
         }
       } else {
         setDniBlocked(false);
-        setPendingRejoinDni("");
-        setRejoinIdValue("");
         setReincorporating(null);
         setDniMessage("No hay una ficha anterior para este DNI. Se registrará como estudiante nuevo.");
       }
     } catch (cause) { setDniMessage(cause instanceof Error ? cause.message : "No se pudo consultar el DNI."); }
-    finally { setDniLookupBusy(false); }
-  }
-
-  async function lookupStudentById() {
-    if (!token || !/^\d+$/.test(rejoinIdValue.trim()) || !pendingRejoinDni) return;
-    setDniLookupBusy(true); setDniMessage("");
-    try {
-      const existing = await apiRequest<Row>(`/estudiantes/buscar-id/${rejoinIdValue.trim()}`, token);
-      if (String(existing.dni) !== pendingRejoinDni) {
-        setDniBlocked(true); setDniMessage("Ese ID no corresponde al DNI ingresado."); return;
-      }
-      if (existing.estado === "ACTIVO" && existing.estado_usuario === "ACTIVO") {
-        setDniBlocked(true); setDniMessage("Ese estudiante ya está activo. No se puede duplicar su registro."); return;
-      }
-      setReincorporating(existing); setDniBlocked(false);
-      setDniMessage(`ID verificado. Se recuperó la ficha de ${existing.nombres} ${existing.apellidos}; revisa el canal y los datos.`);
-    } catch (cause) { setDniBlocked(true); setDniMessage(cause instanceof Error ? cause.message : "No se encontró ese ID de estudiante."); }
     finally { setDniLookupBusy(false); }
   }
 
@@ -213,12 +190,11 @@ export function ResourcePage({ section }: { section: string }) {
     <div className="table-panel"><div className="table-scroll"><table><thead><tr>{config.columns.map(([, title]) => <th key={title}>{title}</th>)}{canManage && <th>Acciones</th>}</tr></thead><tbody>
       {loading ? <tr><td colSpan={config.columns.length + Number(canManage)} className="table-message">Consultando la base de datos…</td></tr> : filtered.length === 0 ? <tr><td colSpan={config.columns.length + Number(canManage)} className="table-message">No hay registros para mostrar.</td></tr> : filtered.map((row, index) => { const status = section === "estudiantes" || section === "docentes" ? row.estado_usuario : row.estado; const active = status === "ACTIVO"; return <tr key={String(row.id ?? index)}>{config.columns.map(([key]) => <td key={key}>{key === "estado" || key === "estado_usuario" ? <span className={`record-status ${String(row[key] || "").toLowerCase()}`}>{section === "estudiantes" && row[key] === "INACTIVO" ? "Fuera" : humanize(row[key])}</span> : humanize(row[key])}</td>)}{canManage && <td><div className="record-actions"><button className="button secondary small" onClick={() => beginEdit(row)}>Editar</button>{section !== "horarios" && section !== "notas" && <button className={`button secondary small ${active ? "danger" : "success"}`} disabled={saving} onClick={() => section === "estudiantes" && !active ? beginReincorporation(row) : void changeStatus(row)}>{section === "estudiantes" ? active ? "Marcar fuera" : "Reincorporar" : active ? "Desactivar" : "Activar"}</button>}{section !== "estudiantes" && <button className="text-button danger-text" disabled={saving} onClick={() => void deleteRecord(row)}>{section === "horarios" || section === "notas" ? "Eliminar" : "Dar de baja"}</button>}</div></td>}</tr>; })}
     </tbody></table></div></div>
-    {creating && config.fields && <div className="modal-backdrop" role="presentation"><section className="form-dialog" role="dialog" aria-modal="true"><div className="dialog-heading"><div><span className="eyebrow">{reincorporating ? "REINCORPORACIÓN" : editingRow ? "EDITAR REGISTRO" : "NUEVO REGISTRO"}</span><h2>{reincorporating ? `Reincorporar · ${reincorporating.nombres} ${reincorporating.apellidos}` : editingRow ? `Editar · ${config.title}` : config.title}</h2></div><button className="icon-button" onClick={() => { setCreating(false); setEditingRow(null); setReincorporating(null); }} aria-label="Cerrar">×</button></div>
-      <form key={String(reincorporating?.id || "new-student-record")} onSubmit={createRecord} className="form-stack dialog-form"><div className="form-grid">{visibleFields.map((field) => { const sourceRecord = editingRow || reincorporating; const value = field.name === "estado" && sourceRecord?.estado === undefined ? sourceRecord?.estado_usuario : sourceRecord?.[field.name]; const defaultValue = field.type === "date" && value ? String(value).slice(0, 10) : value === null || value === undefined ? "" : String(value); return <label key={field.name}>{field.label}{field.type === "select" ? <select name={field.name} required={field.required} defaultValue={defaultValue}><option value="">Seleccionar…</option>{(field.options ? field.options.map((option) => ({ ...option })) as Row[] : options[field.source || ""] || []).map((option) => <option key={String(option.id ?? option.value)} value={String(option.value ?? option.id ?? "")}>{String(option.label ?? (option.curso_nombre ? [`Canal ${option.canal_id}`, option.curso_nombre, option.nombre].join(" · ") : [option.nombre, option.nombres, option.apellidos].filter(Boolean).join(" ")))}</option>)}</select> : <input name={field.name} type={field.type || "text"} min={field.type === "number" ? "0.01" : undefined} step={field.type === "number" ? "0.01" : undefined} pattern={field.pattern} maxLength={field.maxLength} required={field.required} readOnly={field.name === "dni" && Boolean(reincorporating)} onBlur={field.name === "dni" && !editingRow ? (event) => void lookupStudentDni(event.currentTarget.value) : undefined} onChange={field.name === "dni" && !editingRow ? () => { if (!reincorporating) { setDniMessage(""); setDniBlocked(false); setPendingRejoinDni(""); setRejoinIdValue(""); } } : undefined} defaultValue={field.type === "password" && sourceRecord ? "" : defaultValue} />}</label>; })}</div>
-        {section === "estudiantes" && pendingRejoinDni && !reincorporating && <div className="student-rejoin-lookup"><label>ID del estudiante o de acceso<input type="text" inputMode="numeric" maxLength={9} value={rejoinIdValue} onChange={(event) => setRejoinIdValue(event.target.value.replace(/\D/g, "").slice(0, 9))} placeholder="Ingresa su ID de 9 dígitos" /></label><button type="button" className="button secondary" disabled={dniLookupBusy || !rejoinIdValue} onClick={() => void lookupStudentById()}>Verificar ID</button></div>}
-        {section === "estudiantes" && dniMessage && <div className={`alert ${dniBlocked ? "error" : "success"}`} role="status">{dniLookupBusy ? "Consultando DNI o ID…" : dniMessage}</div>}
+    {creating && config.fields && <div className={`modal-backdrop ${section === "estudiantes" ? "student-registration-backdrop" : ""}`} role="presentation"><section className="form-dialog" role="dialog" aria-modal="true"><div className="dialog-heading"><div><span className="eyebrow">{reincorporating ? "REINCORPORACIÓN" : editingRow ? "EDITAR REGISTRO" : "NUEVO REGISTRO"}</span><h2>{reincorporating ? `Reincorporar · ${reincorporating.nombres} ${reincorporating.apellidos}` : editingRow ? `Editar · ${config.title}` : config.title}</h2></div><button className="icon-button" onClick={() => { setCreating(false); setEditingRow(null); setReincorporating(null); }} aria-label="Cerrar">×</button></div>
+      <form key={String(reincorporating?.id || "new-student-record")} onSubmit={createRecord} className="form-stack dialog-form"><div className="form-grid">{visibleFields.map((field) => { const sourceRecord = editingRow || reincorporating; const value = field.name === "estado" && sourceRecord?.estado === undefined ? sourceRecord?.estado_usuario : sourceRecord?.[field.name]; const defaultValue = field.type === "date" && value ? String(value).slice(0, 10) : value === null || value === undefined ? "" : String(value); return <label key={field.name}>{field.label}{field.type === "select" ? <select key={`${field.name}-${defaultValue}-${(field.options || options[field.source || ""] || []).length}`} name={field.name} required={field.required} defaultValue={defaultValue}><option value="">Seleccionar…</option>{(field.options ? field.options.map((option) => ({ ...option })) as Row[] : options[field.source || ""] || []).map((option) => <option key={String(option.id ?? option.value)} value={String(option.value ?? option.id ?? "")}>{String(option.label ?? (option.curso_nombre ? [`Canal ${option.canal_id}`, option.curso_nombre, option.nombre].join(" · ") : [option.nombre, option.nombres, option.apellidos].filter(Boolean).join(" ")))}</option>)}</select> : <input name={field.name} type={field.type || "text"} min={field.type === "number" ? "0.01" : undefined} step={field.type === "number" ? "0.01" : undefined} pattern={field.pattern} maxLength={field.maxLength} required={field.required} readOnly={field.name === "dni" && Boolean(reincorporating)} onChange={field.name === "dni" && !editingRow ? (event) => { if (!reincorporating) { const dni = event.currentTarget.value.trim(); setDniMessage(""); setDniBlocked(false); if (/^\d{8}$/.test(dni)) void lookupStudentDni(dni); } } : undefined} defaultValue={field.type === "password" && sourceRecord ? "" : defaultValue} />}</label>; })}</div>
+        {section === "estudiantes" && dniMessage && <div className={`alert ${dniBlocked ? "error" : "success"}`} role="status">{dniLookupBusy ? "Consultando DNI…" : dniMessage}</div>}
         {section === "matriculas" && <p className="form-note">Se crearán cargos pendientes con códigos de pago. La matrícula se activa cuando secretaría registre el primer cobro recibido.</p>}
-        {error && <div className="alert error">{error}</div>}<div className="dialog-actions"><button type="button" className="button secondary" onClick={() => { setCreating(false); setEditingRow(null); setReincorporating(null); }}>Cancelar</button><button className="button primary" disabled={saving || dniLookupBusy || dniBlocked}>{saving ? "Guardando…" : reincorporating ? "Reincorporar alumno" : "Guardar"}</button></div>
+        {error && <div className="alert error">{error}</div>}<div className="dialog-actions"><button type="button" className="button secondary" onClick={() => { setCreating(false); setEditingRow(null); setReincorporating(null); }}>Cancelar</button><button className="button primary" disabled={saving || dniLookupBusy || dniBlocked}>{saving ? "Guardando…" : reincorporating ? "Aceptar reincorporación" : "Guardar"}</button></div>
       </form></section></div>}
   </section>;
 }

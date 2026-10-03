@@ -33,10 +33,7 @@ export class EstudianteController {
   getByDni = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const estudiante = await this.service.getEstudianteByDni(String(req.params.dni));
-      const data = estudiante && (estudiante.estado !== 'ACTIVO' || estudiante.estado_usuario !== 'ACTIVO')
-        ? { registro_inactivo: true }
-        : estudiante;
-      res.status(200).json({ success: true, data });
+      res.status(200).json({ success: true, data: estudiante });
     } catch (error) {
       next(error);
     }
