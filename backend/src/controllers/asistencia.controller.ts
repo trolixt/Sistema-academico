@@ -6,7 +6,8 @@ export class AsistenciaController {
   getStudentsByGroup = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const docenteId = req.user?.rol === 'DOCENTE' ? req.user.perfil_id : undefined;
-      res.status(200).json({ success: true, data: await asistenciaService.getEnrolledStudents(Number(req.params.grupoId), docenteId) });
+      const fecha = req.query.fecha === undefined ? undefined : String(req.query.fecha);
+      res.status(200).json({ success: true, data: await asistenciaService.getEnrolledStudents(Number(req.params.grupoId), docenteId, fecha) });
     } catch (error) { next(error); }
   };
 

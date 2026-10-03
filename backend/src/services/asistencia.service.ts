@@ -5,10 +5,12 @@ export class AsistenciaService {
   async getSessions(filters: AsistenciaFiltro = {}) { return asistenciaRepository.findSessions(filters); }
   async getStudentAttendance(estudianteId: number) { return asistenciaRepository.findByStudent(estudianteId); }
 
-  async getEnrolledStudents(grupoId: number, docenteId?: number) {
+  async getEnrolledStudents(grupoId: number, docenteId?: number, fecha?: string) {
     const group = await asistenciaRepository.findGroup(grupoId, docenteId);
     if (!group) { const error: any = new Error(docenteId ? 'El grupo no existe o no está asignado a este docente' : 'Grupo no encontrado'); error.statusCode = docenteId ? 403 : 404; throw error; }
-    return asistenciaRepository.findEnrolledStudents(grupoId);
+    const scheduled = fecha ? await asistenciaRepository.findScheduledClass(grupoId, fecha) : null;
+    if (fecha && !scheduled) { const error: any = new Error('No hay una clase programada para este grupo en la fecha seleccionada'); error.statusCode = 400; throw error; }
+    return asistenciaRepository.findEnrolledStudents(grupoId, scheduled ? (String(scheduled.hora_inicio) < '13:00' ? 'MANANA' : 'TARDE') : undefined);
   }
 
   async getSession(id: number, docenteId?: number): Promise<any> {
@@ -24,6 +26,8 @@ export class AsistenciaService {
     }
     const group = await asistenciaRepository.findGroup(grupoId, docenteId);
     if (!group) { const error: any = new Error(docenteId ? 'El grupo no existe o no está asignado a este docente' : 'Grupo no encontrado'); error.statusCode = docenteId ? 403 : 404; throw error; }
+    const scheduled = await asistenciaRepository.findScheduledClass(grupoId, fecha);
+    if (!scheduled) { const error: any = new Error('No se puede abrir asistencia: el grupo no tiene clases programadas para ese día.'); error.statusCode = 400; throw error; }
     const holiday = await asistenciaRepository.findScheduleHoliday(Number(group.canal_id), fecha);
     if (holiday) { const error: any = new Error(`No se puede abrir asistencia: no hay clases por ${holiday}.`); error.statusCode = 400; throw error; }
     const id = await asistenciaRepository.openSession(grupoId, fecha);
@@ -43,7 +47,10 @@ export class AsistenciaService {
     if (new Set(submittedIds).size !== submittedIds.length) {
       const error: any = new Error('Cada estudiante debe aparecer una sola vez en la sesión'); error.statusCode = 400; throw error;
     }
-    const enrolled = await asistenciaRepository.findEnrolledStudents(Number(session.grupo_id));
+    const scheduled = await asistenciaRepository.findScheduledClass(Number(session.grupo_id), String(session.fecha).slice(0, 10));
+    if (!scheduled) { const error: any = new Error('La fecha de la sesión no corresponde a una clase programada'); error.statusCode = 400; throw error; }
+    const turno = String(scheduled.hora_inicio) < '13:00' ? 'MANANA' : 'TARDE';
+    const enrolled = await asistenciaRepository.findEnrolledStudents(Number(session.grupo_id), turno);
     const enrolledIds = new Set(enrolled.map((student: any) => Number(student.id)));
     if (details.length !== enrolledIds.size || submittedIds.some((id) => !enrolledIds.has(id))) {
       const error: any = new Error('Registra la asistencia de cada estudiante matriculado una sola vez'); error.statusCode = 400; throw error;

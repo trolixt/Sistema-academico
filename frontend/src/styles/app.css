@@ -237,6 +237,22 @@
 @media(max-width:680px){.schedule-workspace-heading{align-items:flex-start;flex-wrap:wrap}.schedule-workspace-heading>div:nth-child(2){width:calc(100% - 62px);flex:1}.schedule-heading-actions{width:100%;justify-content:stretch}.schedule-heading-actions .button{flex:1;justify-content:center}.schedule-grid-toolbar label{flex:1}.schedule-grid-toolbar select{width:100%}.schedule-grid-toolbar>.button{width:100%}.turn-picker-options{grid-template-columns:1fr;padding:15px}.turn-option{min-height:140px}.all-schedule-content{padding:15px}.mark-holiday-form{align-items:stretch;flex-direction:column}.mark-holiday-form .button{width:100%}.holiday-notice{align-items:flex-start;flex-wrap:wrap}.holiday-notice .button{width:100%}}
 @media(prefers-reduced-motion:reduce){.schedule-grid-cell,.turn-option{transition:none}}
 
+.teacher-attendance-classes{display:grid;gap:10px;padding:14px 18px 18px}
+.teacher-attendance-classes article{display:grid;grid-template-columns:minmax(130px,.65fr) minmax(180px,1.25fr) minmax(120px,.7fr) auto;align-items:center;gap:16px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(110deg,var(--white),var(--soft));transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.teacher-attendance-classes article:hover{transform:translateY(-2px);border-color:#aebcf1;box-shadow:0 9px 22px #20356c12}
+.teacher-attendance-time,.teacher-attendance-info,.teacher-attendance-room{display:grid;gap:5px}
+.teacher-attendance-time>span,.teacher-attendance-room>small{color:#586fc9;font-size:9px;font-weight:800;letter-spacing:.8px}
+.teacher-attendance-time>strong{color:var(--ink);font-size:16px}
+.teacher-attendance-info>strong{color:var(--ink);font-size:13px}
+.teacher-attendance-info>span{color:var(--muted);font-size:10px}
+.teacher-attendance-room>strong{color:var(--ink);font-size:12px}
+.attendance-room-badge{padding:9px 12px;border:1px solid #d6def9;border-radius:9px;background:#f2f5ff;color:#3049b7;font-size:11px;font-weight:750}
+:root[data-theme="dark"] .teacher-attendance-classes article{background:linear-gradient(110deg,#101216,#171a21);border-color:#303642}
+:root[data-theme="dark"] .teacher-attendance-classes article:hover{border-color:#5769b0;box-shadow:0 9px 22px #0005}
+:root[data-theme="dark"] .attendance-room-badge{background:#171d30;border-color:#39466f;color:#c8d0ff}
+@media(max-width:800px){.teacher-attendance-classes article{grid-template-columns:1fr 1fr}.teacher-attendance-classes article>.button{grid-column:1/-1;justify-content:center}}
+@media(max-width:520px){.teacher-attendance-classes article{grid-template-columns:1fr;gap:12px}.teacher-attendance-classes article>.button{grid-column:auto}}
+
 /* Contraste y jerarquía para la programación por canal. */
 .schedule-channel-grid .admission-channel-card{min-height:188px;overflow:hidden;border-color:#d4ddf7;box-shadow:0 10px 28px #233b8010;transition:transform .22s ease,box-shadow .22s ease}
 .schedule-channel-grid .admission-channel-card:hover{transform:translateY(-4px);box-shadow:0 17px 35px #233b8022}

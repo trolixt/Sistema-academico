@@ -17,8 +17,20 @@ export class AsistenciaRepository {
     return rows.length ? String(rows[0].motivo) : null;
   }
 
+  async findScheduledClass(grupoId: number, fecha: string) {
+    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT h.id, h.hora_inicio, h.hora_fin, h.aula
+      FROM Horario h INNER JOIN Grupo g ON g.id = h.grupo_id
+      INNER JOIN CicloAcademico ca ON ca.id = g.ciclo_id
+      WHERE h.grupo_id = ?
+        AND h.dia_semana = CASE DAYOFWEEK(?) WHEN 1 THEN 'DOMINGO' WHEN 2 THEN 'LUNES' WHEN 3 THEN 'MARTES' WHEN 4 THEN 'MIERCOLES' WHEN 5 THEN 'JUEVES' WHEN 6 THEN 'VIERNES' WHEN 7 THEN 'SABADO' END
+        AND COALESCE(h.fecha_inicio, ca.fecha_inicio) <= ?
+        AND COALESCE(h.fecha_fin, ca.fecha_fin) >= ?
+      ORDER BY h.hora_inicio LIMIT 1`, [grupoId, fecha, fecha, fecha]);
+    return rows[0] || null;
+  }
+
   async findSessions(filters: AsistenciaFiltro = {}) {
-    let sql = `SELECT sa.id, sa.grupo_id, sa.fecha, sa.estado,
+    let sql = `SELECT sa.id, sa.grupo_id, DATE_FORMAT(sa.fecha, '%Y-%m-%d') AS fecha, sa.estado,
       g.nombre AS grupo_nombre, c.nombre AS curso_nombre,
       d.nombres AS docente_nombres, d.apellidos AS docente_apellidos,
       ca.nombre AS ciclo_nombre,
@@ -43,7 +55,7 @@ export class AsistenciaRepository {
   }
 
   async findById(id: number) {
-    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT sa.id, sa.grupo_id, sa.fecha, sa.estado,
+    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT sa.id, sa.grupo_id, DATE_FORMAT(sa.fecha, '%Y-%m-%d') AS fecha, sa.estado,
       g.nombre AS grupo_nombre, c.nombre AS curso_nombre, g.docente_id,
       d.nombres AS docente_nombres, d.apellidos AS docente_apellidos, ca.nombre AS ciclo_nombre
       FROM SesionAsistencia sa INNER JOIN Grupo g ON g.id = sa.grupo_id
@@ -76,11 +88,11 @@ export class AsistenciaRepository {
     return rows;
   }
 
-  async findEnrolledStudents(grupoId: number) {
+  async findEnrolledStudents(grupoId: number, turno?: 'MANANA' | 'TARDE') {
     const [rows] = await pool.execute<RowDataPacket[]>(`SELECT DISTINCT e.id, e.codigo_estudiante, e.nombres, e.apellidos
       FROM Grupo g INNER JOIN Estudiante e ON e.canal_id = g.canal_id
       INNER JOIN Matricula m ON m.estudiante_id = e.id AND m.canal_id = g.canal_id AND m.estado = 'ACTIVA'
-      WHERE g.id = ? AND e.estado = 'ACTIVO' ORDER BY e.apellidos, e.nombres`, [grupoId]);
+      WHERE g.id = ? AND e.estado = 'ACTIVO'${turno ? ' AND e.turno = ?' : ''} ORDER BY e.apellidos, e.nombres`, turno ? [grupoId, turno] : [grupoId]);
     return rows;
   }
 

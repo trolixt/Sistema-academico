@@ -366,6 +366,7 @@ export class AcademicoService {
       error.statusCode = 400;
       throw error;
     }
+    if (!classrooms.includes(aula)) throw scheduleError('Selecciona una de las aulas disponibles: 101, 102, 103, 104, 201, 202, 203 o 204.');
 
     if (hora_inicio >= hora_fin) {
       const error: any = new Error('La hora de inicio debe ser anterior a la hora de fin');
@@ -408,6 +409,7 @@ export class AcademicoService {
     const horaInicio = dto.hora_inicio ?? actual.hora_inicio;
     const horaFin = dto.hora_fin ?? actual.hora_fin;
     const aula = dto.aula ?? actual.aula;
+    if (dto.aula !== undefined && !classrooms.includes(dto.aula)) throw scheduleError('Selecciona una de las aulas disponibles: 101, 102, 103, 104, 201, 202, 203 o 204.');
     if (horaInicio >= horaFin) {
       const error: any = new Error('La hora de inicio debe ser anterior a la hora de fin');
       error.statusCode = 400;
@@ -511,6 +513,8 @@ function dateOnly(value: string | Date): string {
 function scheduleError(message: string, statusCode = 400): Error & { statusCode: number } {
   return Object.assign(new Error(message), { statusCode });
 }
+
+const classrooms = ['Aula 101', 'Aula 102', 'Aula 103', 'Aula 104', 'Aula 201', 'Aula 202', 'Aula 203', 'Aula 204'];
 
 function validateScheduleDates(start: string, end: string, cycleStart: string, cycleEnd: string): void {
   if (!isValidDateOnly(start) || !isValidDateOnly(end) || start > end) throw scheduleError('El periodo del horario no es válido.');
