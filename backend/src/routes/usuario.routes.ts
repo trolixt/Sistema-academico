@@ -12,6 +12,9 @@ router.patch('/me/cambiar-password', usuarioController.cambiarPassword);
 
 // Consulta administrativa de cuentas sin hashes de contraseña.
 router.get('/', authorizeRoles('ADMINISTRADOR'), usuarioController.getAll);
+router.post('/secretaria', authorizeRoles('ADMINISTRADOR'), usuarioController.createSecretaria);
+router.put('/:id/secretaria', authorizeRoles('ADMINISTRADOR'), usuarioController.updateSecretaria);
+router.patch('/:id/estado', authorizeRoles('ADMINISTRADOR'), usuarioController.updateEstado);
 
 // Consulta por ID: Solo Administrador
 router.get('/:id', authorizeRoles('ADMINISTRADOR'), usuarioController.getById);

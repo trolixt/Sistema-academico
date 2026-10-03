@@ -1,19 +1,21 @@
 import pool from '../config/database';
 import { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
-import { IEstudiante, EstudianteConUsuario, CreateEstudianteDTO, UpdateEstudianteDTO, EstadoUsuario } from '../types';
+import { EstudianteConUsuario, CreateEstudianteDTO, UpdateEstudianteDTO, EstadoUsuario } from '../types';
 
 export class EstudianteRepository {
 
   /**
    * Lista todos los estudiantes con su estado de cuenta
    */
-  async findAll(): Promise<EstudianteConUsuario[]> {
+  async findAll(includeInactive = false): Promise<EstudianteConUsuario[]> {
     const query = `
-      SELECT e.id, e.usuario_id, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
+      SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
              e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
              u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e
       INNER JOIN Usuario u ON e.usuario_id = u.id
+      LEFT JOIN Canal ca ON ca.id = e.canal_id
+      ${includeInactive ? '' : "WHERE e.estado = 'ACTIVO' AND u.estado = 'ACTIVO'"}
       ORDER BY e.apellidos ASC, e.nombres ASC
     `;
     const [rows] = await pool.execute<RowDataPacket[]>(query);
@@ -25,11 +27,12 @@ export class EstudianteRepository {
    */
   async findById(id: number): Promise<EstudianteConUsuario | null> {
     const query = `
-      SELECT e.id, e.usuario_id, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
+      SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante, e.nombres, e.apellidos, e.dni,
              e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
              u.nombre_usuario, u.estado AS estado_usuario
       FROM Estudiante e
       INNER JOIN Usuario u ON e.usuario_id = u.id
+      LEFT JOIN Canal ca ON ca.id = e.canal_id
       WHERE e.id = ?
       LIMIT 1
     `;
@@ -38,14 +41,29 @@ export class EstudianteRepository {
     return rows[0] as EstudianteConUsuario;
   }
 
+  async findByEitherId(id: number): Promise<EstudianteConUsuario[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre,
+      e.codigo_estudiante, e.nombres, e.apellidos, e.dni, e.fecha_nacimiento, e.telefono, e.correo, e.direccion,
+      e.estado, u.nombre_usuario, u.estado AS estado_usuario
+      FROM Estudiante e INNER JOIN Usuario u ON u.id = e.usuario_id
+      LEFT JOIN Canal ca ON ca.id = e.canal_id
+      WHERE e.id = ? OR e.usuario_id = ?
+      ORDER BY CASE WHEN e.id = ? THEN 0 ELSE 1 END`, [id, id, id]);
+    return rows as EstudianteConUsuario[];
+  }
+
   /**
    * Busca un estudiante por DNI
    */
-  async findByDni(dni: string): Promise<IEstudiante | null> {
-    const query = `SELECT * FROM Estudiante WHERE dni = ? LIMIT 1`;
+  async findByDni(dni: string): Promise<EstudianteConUsuario | null> {
+    const query = `SELECT e.id, e.usuario_id, e.canal_id, ca.nombre AS canal_nombre, e.codigo_estudiante,
+      e.nombres, e.apellidos, e.dni, e.fecha_nacimiento, e.telefono, e.correo, e.direccion, e.estado,
+      u.nombre_usuario, u.estado AS estado_usuario
+      FROM Estudiante e INNER JOIN Usuario u ON u.id = e.usuario_id
+      LEFT JOIN Canal ca ON ca.id = e.canal_id WHERE e.dni = ? LIMIT 1`;
     const [rows] = await pool.execute<RowDataPacket[]>(query, [dni]);
     if (rows.length === 0) return null;
-    return rows[0] as IEstudiante;
+    return rows[0] as EstudianteConUsuario;
   }
 
   /**
@@ -83,6 +101,7 @@ export class EstudianteRepository {
       telefono?: string;
       correo?: string;
       direccion?: string;
+      canal_id?: number;
       codigo_estudiante: string;
     }
   ): Promise<number> {
@@ -99,10 +118,11 @@ export class EstudianteRepository {
 
       // 2. Crear perfil de estudiante
       const [estudianteResult] = await conn.execute<ResultSetHeader>(
-        `INSERT INTO Estudiante (usuario_id, codigo_estudiante, nombres, apellidos, dni, fecha_nacimiento, telefono, correo, direccion, estado)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO')`,
+        `INSERT INTO Estudiante (usuario_id, canal_id, codigo_estudiante, nombres, apellidos, dni, fecha_nacimiento, telefono, correo, direccion, estado)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVO')`,
         [
           usuarioId,
+          data.canal_id ?? null,
           data.codigo_estudiante,
           data.nombres.trim(),
           data.apellidos.trim(),
@@ -132,6 +152,7 @@ export class EstudianteRepository {
     const params: any[] = [];
 
     if (data.nombres !== undefined) { fields.push('nombres = ?'); params.push(data.nombres.trim()); }
+    if (data.canal_id !== undefined) { fields.push('canal_id = ?'); params.push(data.canal_id); }
     if (data.apellidos !== undefined) { fields.push('apellidos = ?'); params.push(data.apellidos.trim()); }
     if (data.dni !== undefined) { fields.push('dni = ?'); params.push(data.dni.trim()); }
     if (data.fecha_nacimiento !== undefined) { fields.push('fecha_nacimiento = ?'); params.push(data.fecha_nacimiento); }
@@ -159,6 +180,46 @@ export class EstudianteRepository {
       [estado, usuarioId]
     );
     return result.affectedRows > 0;
+  }
+
+  async findChannel(id: number) {
+    const [rows] = await pool.execute<RowDataPacket[]>("SELECT id FROM Canal WHERE id = ? AND estado = 'ACTIVO'", [id]);
+    return rows.length > 0;
+  }
+
+  async updateProfileAndStatus(id: number, usuarioId: number, status: EstadoUsuario, data: UpdateEstudianteDTO = {}) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      let cambiaCanal = false;
+      if (data.canal_id !== undefined) {
+        const [currentRows] = await connection.execute<RowDataPacket[]>('SELECT canal_id FROM Estudiante WHERE id = ? FOR UPDATE', [id]);
+        cambiaCanal = Number(currentRows[0]?.canal_id) !== Number(data.canal_id);
+      }
+      const fields: string[] = [];
+      const values: (string | number | null)[] = [];
+      for (const key of ['nombres', 'apellidos', 'dni', 'fecha_nacimiento', 'telefono', 'correo', 'direccion', 'canal_id'] as const) {
+        if (data[key] !== undefined) {
+          fields.push(`${key} = ?`);
+          const value = data[key];
+          values.push(typeof value === 'string' ? value.trim() || null : value ?? null);
+        }
+      }
+      fields.push('estado = ?');
+      values.push(status);
+      values.push(id);
+      await connection.execute(`UPDATE Estudiante SET ${fields.join(', ')} WHERE id = ?`, values);
+      await connection.execute('UPDATE Usuario SET estado = ? WHERE id = ?', [status, usuarioId]);
+      if (status === 'INACTIVO' || cambiaCanal) {
+        await connection.execute("UPDATE Matricula SET estado = 'RETIRADA' WHERE estudiante_id = ? AND estado IN ('ACTIVA', 'PENDIENTE_PAGO')", [id]);
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   /**

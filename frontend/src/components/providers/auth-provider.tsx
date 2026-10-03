@@ -8,7 +8,7 @@ type AuthState = {
   token: string | null;
   usuario: Usuario | null;
   cargando: boolean;
-  iniciarSesion: (username: string, password: string) => Promise<void>;
+  iniciarSesion: (id: string, password: string) => Promise<void>;
   cerrarSesion: () => void;
 };
 const AuthContext = createContext<AuthState | null>(null);
@@ -28,8 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => setCargando(false));
   }, []);
 
-  async function iniciarSesion(username: string, password: string) {
-    const result = await loginRequest(username, password);
+  async function iniciarSesion(id: string, password: string) {
+    const result = await loginRequest(id, password);
     sessionStorage.setItem(TOKEN_KEY, result.token);
     setToken(result.token);
     setUsuario(result.usuario);

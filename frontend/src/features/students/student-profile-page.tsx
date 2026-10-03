@@ -15,6 +15,8 @@ type StudentProfile = {
   direccion: string | null;
   estado: string;
   estado_usuario: string;
+  canal_id: number | null;
+  canal_nombre: string | null;
 };
 
 export function StudentProfilePage() {
@@ -47,6 +49,7 @@ export function StudentProfilePage() {
           <ProfileField label="Apellidos" value={profile.apellidos} />
           <ProfileField label="Documento de identidad" value={profile.dni} />
           <ProfileField label="Fecha de nacimiento" value={formatDate(profile.fecha_nacimiento)} />
+          <ProfileField label="Canal de preparación" value={profile.canal_id ? `Canal ${profile.canal_id} · ${profile.canal_nombre || ""}` : null} />
         </div></section>
         <section className="profile-details-card"><header className="profile-section-heading"><span className="profile-section-icon contact-icon">⌖</span><div><h3>Contacto</h3><p>Información para comunicarnos contigo</p></div></header><div className="profile-fields">
           <ProfileField label="Correo electrónico" value={profile.correo} />

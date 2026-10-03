@@ -56,7 +56,7 @@ export class DocenteService {
     }
 
     // Nombre de usuario por defecto: DNI
-    const nombreUsuario = dto.nombre_usuario?.trim() || dto.dni.trim();
+    const nombreUsuario = dto.nombre_usuario?.trim() || `DOCENTE-${dto.dni.trim()}`;
     const existeUsuario = await this.repo.findByNombreUsuario(nombreUsuario);
     if (existeUsuario) {
       const error: any = new Error(`El nombre de usuario "${nombreUsuario}" ya está en uso`);

@@ -71,7 +71,10 @@ export function AttendancePage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "No se pudo cerrar la sesión."); }
   }
 
-  const columns = isStudent ? [["fecha", "Fecha"], ["curso_nombre", "Curso"], ["grupo_nombre", "Grupo"], ["ciclo_nombre", "Ciclo"], ["docente_nombres", "Docente"], ["estado_asistencia", "Estado"]] : [["fecha", "Fecha"], ["curso_nombre", "Curso"], ["grupo_nombre", "Grupo"], ["ciclo_nombre", "Ciclo"], ["docente_nombres", "Docente"], ["total_estudiantes", "Registrados"], ["presentes", "Presentes"], ["ausentes", "Ausentes"], ["tardanzas", "Tardanzas"], ["justificados", "Justificados"], ["estado", "Sesión"]];
+  const studentSummaries = isStudent ? summarizeAttendance(sessions) : [];
+  const studentColumns = [["curso_nombre", "Curso"], ["grupo_nombre", "Grupo"], ["porcentaje", "Asistencia"]];
+  const columns = isStudent ? studentColumns : [["fecha", "Fecha"], ["curso_nombre", "Curso"], ["grupo_nombre", "Grupo"], ["ciclo_nombre", "Ciclo"], ["docente_nombres", "Docente"], ["total_estudiantes", "Registrados"], ["presentes", "Presentes"], ["ausentes", "Ausentes"], ["tardanzas", "Tardanzas"], ["justificados", "Justificados"], ["estado", "Sesión"]];
+  const visibleRows = isStudent ? studentSummaries : sessions;
   return <section className="data-page">
     <div className="page-intro"><div><span className="eyebrow">SEGUIMIENTO ACADÉMICO</span><h2>{isStudent ? "Mi asistencia" : "Asistencia"}</h2><p>Registros y sesiones de asistencia consultados desde la base de datos.</p></div></div>
     {error && <div className="alert error" role="alert">{error}</div>}{message && <div className="alert success">{message}</div>}
@@ -82,8 +85,24 @@ export function AttendancePage() {
         {session.estado === "ABIERTA" && <div className="dialog-actions"><button className="button secondary" onClick={() => void closeSession()}>Cerrar sesión</button><button className="button primary" onClick={() => void saveAttendance()}>Guardar asistencia</button></div>}
       </div>}
     </section>}
-    <section className="table-panel"><div className="section-heading"><div><h3>{isStudent ? "Historial de asistencia" : "Sesiones registradas"}</h3><p>{loading ? "Consultando MySQL…" : `${sessions.length} registros`}</p></div></div><div className="table-scroll"><table><thead><tr>{columns.map(([, label]) => <th key={label}>{label}</th>)}</tr></thead><tbody>{loading ? <tr><td colSpan={columns.length} className="table-message">Consultando…</td></tr> : sessions.length === 0 ? <tr><td colSpan={columns.length} className="table-message">No hay registros de asistencia.</td></tr> : sessions.map((row, index) => <tr key={String(row.id ?? `${row.fecha}-${index}`)}>{columns.map(([key]) => <td key={key}>{key === "fecha" ? formatDate(row[key]) : row[key] ?? "—"}</td>)}</tr>)}</tbody></table></div></section>
+    <section className="table-panel"><div className="section-heading"><div><h3>{isStudent ? "Porcentaje de asistencia por curso" : "Sesiones registradas"}</h3><p>{loading ? "Consultando MySQL…" : `${visibleRows.length} ${isStudent ? "cursos" : "registros"}`}</p></div></div><div className="table-scroll"><table><thead><tr>{columns.map(([, label]) => <th key={label}>{label}</th>)}</tr></thead><tbody>{loading ? <tr><td colSpan={columns.length} className="table-message">Consultando…</td></tr> : visibleRows.length === 0 ? <tr><td colSpan={columns.length} className="table-message">No hay registros de asistencia.</td></tr> : visibleRows.map((row, index) => <tr key={String(row.id ?? `${row.curso_nombre}-${row.grupo_nombre}-${index}`)}>{columns.map(([key]) => <td key={key}>{key === "fecha" ? formatDate(row[key]) : row[key] ?? "—"}</td>)}</tr>)}</tbody></table></div></section>
   </section>;
 }
 
 function formatDate(value: string) { return value ? new Intl.DateTimeFormat("es-PE", { dateStyle: "medium" }).format(new Date(value)) : "—"; }
+
+function summarizeAttendance(sessions: Row[]) {
+  const summary = new Map<string, Row>();
+  for (const session of sessions) {
+    const key = `${session.curso_nombre}::${session.grupo_nombre}`;
+    const row = summary.get(key) || { curso_nombre: session.curso_nombre, grupo_nombre: session.grupo_nombre, puntos: 0, total: 0 };
+    if (session.estado_asistencia !== "JUSTIFICADO") {
+      row.total += 2;
+      if (session.estado_asistencia === "PRESENTE") row.puntos += 2;
+      if (session.estado_asistencia === "TARDANZA") row.puntos += 1;
+    }
+    row.porcentaje = row.total ? `${((row.puntos / row.total) * 100).toLocaleString("es-PE", { maximumFractionDigits: 1 })}%` : "Sin sesiones computables";
+    summary.set(key, row);
+  }
+  return [...summary.values()];
+}

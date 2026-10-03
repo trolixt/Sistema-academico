@@ -16,19 +16,21 @@ export class MatriculaRepository {
   async findAll(filtros?: { estudiante_id?: number; grupo_id?: number; ciclo_id?: number; estado?: EstadoMatricula }): Promise<IMatriculaDetalle[]> {
     let query = `
       SELECT
-        m.id, m.codigo_matricula, m.estudiante_id, m.grupo_id, m.ciclo_id, m.estado, m.fecha_registro,
+        m.id, m.codigo_matricula, m.estudiante_id, m.canal_id, m.grupo_id, m.ciclo_id, m.estado, m.fecha_registro,
         e.nombres AS estudiante_nombres, e.apellidos AS estudiante_apellidos,
         e.dni AS estudiante_dni, e.codigo_estudiante, e.correo AS estudiante_correo,
         g.nombre AS grupo_nombre, g.curso_id, g.docente_id,
         c.nombre AS curso_nombre,
+        canal.nombre AS canal_nombre,
         ca.nombre AS ciclo_nombre,
         d.nombres AS docente_nombres, d.apellidos AS docente_apellidos
       FROM Matricula m
       INNER JOIN Estudiante e ON m.estudiante_id = e.id
-      INNER JOIN Grupo g ON m.grupo_id = g.id
-      INNER JOIN Curso c ON g.curso_id = c.id
+      LEFT JOIN Grupo g ON m.grupo_id = g.id
+      LEFT JOIN Curso c ON g.curso_id = c.id
+      INNER JOIN Canal canal ON canal.id = m.canal_id
       INNER JOIN CicloAcademico ca ON m.ciclo_id = ca.id
-      INNER JOIN Docente d ON g.docente_id = d.id
+      LEFT JOIN Docente d ON g.docente_id = d.id
       WHERE 1 = 1
     `;
     const params: any[] = [];
@@ -50,19 +52,21 @@ export class MatriculaRepository {
   async findById(id: number): Promise<IMatriculaDetalle | null> {
     const query = `
       SELECT
-        m.id, m.codigo_matricula, m.estudiante_id, m.grupo_id, m.ciclo_id, m.estado, m.fecha_registro,
+        m.id, m.codigo_matricula, m.estudiante_id, m.canal_id, m.grupo_id, m.ciclo_id, m.estado, m.fecha_registro,
         e.nombres AS estudiante_nombres, e.apellidos AS estudiante_apellidos,
         e.dni AS estudiante_dni, e.codigo_estudiante, e.correo AS estudiante_correo,
         g.nombre AS grupo_nombre, g.curso_id, g.docente_id,
         c.nombre AS curso_nombre,
+        canal.nombre AS canal_nombre,
         ca.nombre AS ciclo_nombre,
         d.nombres AS docente_nombres, d.apellidos AS docente_apellidos
       FROM Matricula m
       INNER JOIN Estudiante e ON m.estudiante_id = e.id
-      INNER JOIN Grupo g ON m.grupo_id = g.id
-      INNER JOIN Curso c ON g.curso_id = c.id
+      LEFT JOIN Grupo g ON m.grupo_id = g.id
+      LEFT JOIN Curso c ON g.curso_id = c.id
+      INNER JOIN Canal canal ON canal.id = m.canal_id
       INNER JOIN CicloAcademico ca ON m.ciclo_id = ca.id
-      INNER JOIN Docente d ON g.docente_id = d.id
+      LEFT JOIN Docente d ON g.docente_id = d.id
       WHERE m.id = ?
       LIMIT 1
     `;
@@ -74,12 +78,12 @@ export class MatriculaRepository {
   /**
    * Verifica si ya existe una matrícula activa para ese estudiante en el mismo grupo y ciclo
    */
-  async findDuplicada(estudianteId: number, grupoId: number, cicloId: number): Promise<IMatricula | null> {
+  async findDuplicada(estudianteId: number, canalId: number, cicloId: number): Promise<IMatricula | null> {
     const [rows] = await pool.execute<RowDataPacket[]>(
       `SELECT id, codigo_matricula, estado FROM Matricula
-       WHERE estudiante_id = ? AND grupo_id = ? AND ciclo_id = ?
+       WHERE estudiante_id = ? AND canal_id = ? AND ciclo_id = ? AND estado IN ('ACTIVA', 'PENDIENTE_PAGO')
        LIMIT 1`,
-      [estudianteId, grupoId, cicloId]
+      [estudianteId, canalId, cicloId]
     );
     return rows.length > 0 ? (rows[0] as IMatricula) : null;
   }
@@ -119,7 +123,7 @@ export class MatriculaRepository {
     data: {
       codigo_matricula: string;
       estudiante_id: number;
-      grupo_id: number;
+      canal_id: number;
       ciclo_id: number;
     },
     pagoInicial: {
@@ -133,11 +137,12 @@ export class MatriculaRepository {
       await conn.beginTransaction();
 
       const [result] = await conn.execute<ResultSetHeader>(
-        `INSERT INTO Matricula (codigo_matricula, estudiante_id, grupo_id, ciclo_id, estado, monto_mensualidad)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [data.codigo_matricula, data.estudiante_id, data.grupo_id, data.ciclo_id, 'PENDIENTE_PAGO', pagoInicial.monto_mensualidad]
+        `INSERT INTO Matricula (codigo_matricula, estudiante_id, canal_id, grupo_id, ciclo_id, estado, monto_mensualidad)
+         VALUES (?, ?, ?, NULL, ?, ?, ?)`,
+        [data.codigo_matricula, data.estudiante_id, data.canal_id, data.ciclo_id, 'PENDIENTE_PAGO', pagoInicial.monto_mensualidad]
       );
       const matriculaId = result.insertId;
+      await conn.execute('UPDATE Estudiante SET canal_id = ? WHERE id = ?', [data.canal_id, data.estudiante_id]);
 
       const [paymentResult] = await conn.execute<ResultSetHeader>(
         `INSERT INTO Pago (matricula_id, concepto, tipo_pago, monto, metodo_pago, estado, fecha)

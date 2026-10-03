@@ -15,7 +15,7 @@ export function SystemShell({ children }: { children: React.ReactNode }) {
   useEffect(() => { if (!cargando && (!token || !usuario)) router.replace("/"); }, [cargando, token, usuario, router]);
   useEffect(() => {
     if (!cargando && token && usuario && !navigationByRole[usuario.rol].some((group) => group.items.some((item) => item.href === pathname))) {
-      router.replace("/dashboard");
+      router.replace(usuario.rol === "ADMINISTRADOR" ? "/administracion" : "/dashboard");
     }
   }, [cargando, token, usuario, pathname, router]);
 
@@ -31,7 +31,7 @@ export function SystemShell({ children }: { children: React.ReactNode }) {
       <nav className="main-navigation" aria-label="Navegación principal">
         {groups.map(({ title, items: groupItems }) => <section className="nav-group" key={title}><span className="nav-caption">{title}</span>{groupItems.map(({ href, label: itemLabel }) => <Link key={href} href={href} className={`nav-link ${pathname === href ? "selected" : ""}`}><span className="nav-dot" />{itemLabel}</Link>)}</section>)}
       </nav>
-      <div className="sidebar-bottom"><span className="user-avatar">{nombre.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><div className="user-info"><strong>{nombre}</strong><small>{usuario.nombre_usuario}</small></div><button className="text-button" onClick={() => { cerrarSesion(); router.replace("/"); }}>Salir</button></div>
+      <div className="sidebar-bottom"><span className="user-avatar">{nombre.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span><div className="user-info"><strong>{nombre}</strong><small>ID de acceso {usuario.id}</small></div><button className="text-button" onClick={() => { cerrarSesion(); router.replace("/"); }}>Salir</button></div>
     </aside>
     <main className="main-area"><header className="topbar"><div><span className="breadcrumb">SA-studios / {usuario.rol.toLowerCase()}</span><h1>{label}</h1></div><div className="topbar-actions"><ThemeToggle /></div></header><div className="page-content">{children}</div></main>
   </div>;

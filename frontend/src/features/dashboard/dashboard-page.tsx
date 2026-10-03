@@ -43,18 +43,20 @@ export function DashboardPage() {
 
 async function dashboardData(token: string, usuario: Usuario) {
   if (usuario.rol === "ESTUDIANTE") {
-    const [matriculas, pagos] = await Promise.all([
-      apiRequest<Row[]>("/matriculas/me", token), apiRequest<Row[]>("/pagos/me", token),
+    const [matriculas, pagos, profile] = await Promise.all([
+      apiRequest<Row[]>("/matriculas/me", token), apiRequest<Row[]>("/pagos/me", token), apiRequest<Row>("/estudiantes/me", token),
     ]);
+    const areas = profile.canal_id ? await apiRequest<Row[]>(`/academicos/canales/${profile.canal_id}/areas`, token) : [];
+    const activeChannels = new Set(matriculas.filter((row) => row.estado === "ACTIVA").map((row) => `${row.canal_id}-${row.ciclo_id}`));
     const pending = pagos.filter((pago) => pago.estado === "PENDIENTE");
     return {
       metrics: [
-        { label: "Matrículas", value: matriculas.length, description: "Vinculadas a tu cuenta" },
-        { label: "Cursos", value: matriculas.filter((row) => row.estado === "ACTIVA").length, description: "Con matrícula activa" },
+        { label: "Matrículas", value: activeChannels.size, description: "Canales vinculados a tu cuenta" },
+        { label: "Cursos", value: areas.length, description: "Incluidos en tu canal" },
         { label: "Pagos pendientes", value: pending.length, description: "Registros pendientes en tu cuenta" },
         { label: "Importe pendiente", value: currency(pending.reduce((sum, payment) => sum + Number(payment.monto || 0), 0)), description: "Suma de pagos pendientes" },
       ],
-      recent: pagos.slice(0, 6), columns: [["concepto", "Concepto"], ["curso_nombre", "Curso"], ["fecha", "Fecha"], ["monto", "Importe"], ["estado", "Estado"]] as [string, string][],
+      recent: pagos.slice(0, 6), columns: [["concepto", "Concepto"], ["canal_nombre", "Canal"], ["fecha", "Fecha"], ["monto", "Importe"], ["estado", "Estado"]] as [string, string][],
     };
   }
   if (usuario.rol === "DOCENTE") {

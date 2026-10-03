@@ -1,33 +1,56 @@
 CREDENCIALES DE DEMOSTRACIÓN — SA-studios
-====================================
+========================================
 
-Estas cuentas se insertan al importar docs/database.sql.
-El inicio de sesión valida las contraseñas contra la API y sus hashes bcrypt.
+Estas cuentas ficticias corresponden a las filas insertadas en
+docs/database.sql. Para ingresar se usa el ID de acceso (Usuario.id) y la
+contraseña; el nombre de usuario que aparece entre paréntesis solo sirve para
+identificar la cuenta en el SQL.
 
-Administrador del sistema
-  Usuario: admin
-  Contraseña: Admin2026*
+ID de acceso: 1
+Rol: Administrador
+Contraseña: Admin2026*
+Usuario de referencia: admin
 
-Personal administrativo
-  Usuario: secretaria
-  Contraseña: Administrativo2026*
+ID de acceso: 2
+Rol: Secretaría (ADMINISTRATIVO)
+Contraseña: Administrativo2026*
+Usuario de referencia: secretaria
 
-Docente
-  Usuario: docente
-  Contraseña: Docente2026*
+ID de acceso: 3
+Rol: Docente
+Contraseña: Docente2026*
+Usuario de referencia: docente
 
-Estudiante
-  Usuario: estudiante
-  Contraseña: Estudiante2026*
+ID de acceso: 4
+Rol: Estudiante — Mariana Salazar
+Contraseña: Estudiante2026*
+Usuario de referencia: estudiante
 
-Estudiantes de demostración adicionales
-  Usuario: diego
-  Contraseña: Estudiante2026*
-  Usuario: valeria
-  Contraseña: Estudiante2026*
+ID de acceso: 5
+Rol: Estudiante — Diego Quispe
+Contraseña: Estudiante2026*
+Usuario de referencia: diego
 
-API local: http://localhost:4000/api
-Frontend Next.js local: http://localhost:8443
+ID de acceso: 6
+Rol: Estudiante — Valeria Mendoza
+Contraseña: Estudiante2026*
+Usuario de referencia: valeria
 
-Las cuentas se insertan al importar docs/database.sql. Cambie estas claves
-antes de usar el sistema con información real.
+Configuración local
+-------------------
+API: http://localhost:4000/api
+Frontend: http://localhost:8443
+
+El comando npm run seed crea una cuenta administradora solo si no encuentra
+un usuario con nombre de referencia "admin". La contraseña inicial es
+Admin2026* y el script muestra el ID generado. Si el usuario ya existe, el
+script muestra su ID y no cambia su contraseña.
+
+Este archivo no enumera cuentas de bases de datos activas o productivas. Las
+cuentas reales se revisan desde Administración; las contraseñas existentes no
+se pueden leer porque se guardan como hashes. Restablece una contraseña desde
+el sistema cuando sea necesario.
+
+Antes de usar las cuentas demo en un entorno compartido, cambia sus
+contraseñas. Nunca copies aquí valores de backend/.env, claves reales ni
+contraseñas de usuarios reales.

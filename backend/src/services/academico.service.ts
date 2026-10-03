@@ -12,7 +12,8 @@ import {
   IGrupoDetalle,
   FiltrosGrupoDTO,
   IHorario,
-  CreateHorarioDTO
+  CreateHorarioDTO,
+  UpdateHorarioDTO
 } from '../types';
 
 export class AcademicoService {
@@ -52,18 +53,32 @@ export class AcademicoService {
       throw error;
     }
 
+    if (await this.repo.findCursoByName(dto.nombre)) {
+      const error: any = new Error(`El área "${dto.nombre.trim()}" ya está registrada`);
+      error.statusCode = 409;
+      throw error;
+    }
+
     const insertId = await this.repo.createCurso(dto);
     const nuevoCurso = await this.repo.findCursoById(insertId);
     return nuevoCurso!;
   }
 
   async updateCurso(id: number, dto: UpdateCursoDTO): Promise<ICurso> {
-    await this.getCursoById(id);
+    const current = await this.getCursoById(id);
 
     if (dto.nombre !== undefined && dto.nombre.trim() === '') {
       const error: any = new Error('El nombre del curso no puede estar vacío');
       error.statusCode = 400;
       throw error;
+    }
+
+    if (dto.nombre !== undefined && dto.nombre.trim().toLocaleLowerCase() !== current.nombre.toLocaleLowerCase()) {
+      if (await this.repo.findCursoByName(dto.nombre)) {
+        const error: any = new Error(`El área "${dto.nombre.trim()}" ya está registrada`);
+        error.statusCode = 409;
+        throw error;
+      }
     }
 
     await this.repo.updateCurso(id, dto);
@@ -200,6 +215,12 @@ export class AcademicoService {
       error.statusCode = 400;
       throw error;
     }
+    const canal = await this.repo.findCanal(Number(dto.canal_id));
+    if (!canal || canal.estado !== 'ACTIVO') {
+      const error: any = new Error('Selecciona uno de los cuatro canales activos');
+      error.statusCode = 400;
+      throw error;
+    }
 
     const capacidad = dto.capacidad !== undefined ? Number(dto.capacidad) : 30;
     if (isNaN(capacidad) || capacidad <= 0) {
@@ -212,6 +233,11 @@ export class AcademicoService {
     const curso = await this.repo.findCursoById(dto.curso_id);
     if (!curso || curso.estado !== 'ACTIVO') {
       const error: any = new Error('El curso seleccionado no existe o se encuentra inactivo');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (!await this.repo.isCursoInCanal(Number(dto.canal_id), Number(dto.curso_id))) {
+      const error: any = new Error('El área seleccionada no pertenece al canal elegido');
       error.statusCode = 400;
       throw error;
     }
@@ -242,6 +268,24 @@ export class AcademicoService {
 
   async updateGrupo(id: number, dto: UpdateGrupoDTO): Promise<IGrupoDetalle> {
     const grupoActual = await this.getGrupoById(id);
+
+    if (dto.canal_id !== undefined) {
+      const canal = await this.repo.findCanal(Number(dto.canal_id));
+      if (!canal || canal.estado !== 'ACTIVO') {
+        const error: any = new Error('Selecciona uno de los cuatro canales activos');
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+    if (dto.curso_id !== undefined || dto.canal_id !== undefined) {
+      const nextCurso = dto.curso_id ?? grupoActual.curso_id;
+      const nextCanal = dto.canal_id ?? grupoActual.canal_id;
+      if (!await this.repo.isCursoInCanal(Number(nextCanal), Number(nextCurso))) {
+        const error: any = new Error('El área seleccionada no pertenece al canal elegido');
+        error.statusCode = 400;
+        throw error;
+      }
+    }
 
     // Si se actualiza la capacidad, validar que no sea menor a las matrículas activas ya existentes
     if (dto.capacidad !== undefined) {
@@ -366,6 +410,50 @@ export class AcademicoService {
     const insertId = await this.repo.createHorario(dto);
     const nuevoHorario = await this.repo.findHorarioById(insertId);
     return nuevoHorario!;
+  }
+
+  async updateHorario(id: number, dto: UpdateHorarioDTO): Promise<IHorario> {
+    const actual = await this.repo.findHorarioById(id);
+    if (!actual) {
+      const error: any = new Error(`Horario con ID ${id} no encontrado`);
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const grupoId = dto.grupo_id ?? actual.grupo_id;
+    const dia = dto.dia_semana ?? actual.dia_semana;
+    const horaInicio = dto.hora_inicio ?? actual.hora_inicio;
+    const horaFin = dto.hora_fin ?? actual.hora_fin;
+    const aula = dto.aula ?? actual.aula;
+    if (horaInicio >= horaFin) {
+      const error: any = new Error('La hora de inicio debe ser anterior a la hora de fin');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const grupo = await this.getGrupoById(grupoId);
+    if (grupo.estado !== 'ACTIVO') {
+      const error: any = new Error('No se pueden asignar horarios a un grupo inactivo');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const cruceDocente = await this.repo.checkCrucesHorarioDocente(grupo.docente_id, dia, horaInicio, horaFin, undefined, id);
+    if (cruceDocente) {
+      const error: any = new Error(`Conflicto de Horario del Docente: El profesor ya tiene asignada la clase "${cruceDocente.curso_nombre}" (${cruceDocente.grupo_nombre}) el ${dia} de ${cruceDocente.hora_inicio} a ${cruceDocente.hora_fin}.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const cruceAula = await this.repo.checkCrucesHorarioAula(aula, dia, horaInicio, horaFin, undefined, id);
+    if (cruceAula) {
+      const error: any = new Error(`Conflicto de Aula: El "${aula}" ya se encuentra ocupada por el grupo "${cruceAula.grupo_nombre}" (${cruceAula.curso_nombre}) el ${dia} de ${cruceAula.hora_inicio} a ${cruceAula.hora_fin}.`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    await this.repo.updateHorario(id, dto);
+    return (await this.repo.findHorarioById(id))!;
   }
 
   async deleteHorario(id: number): Promise<{ message: string }> {

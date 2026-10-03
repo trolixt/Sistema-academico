@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { academicoController } from '../controllers/academico.controller';
 import { authenticateToken, authorizeRoles } from '../middlewares/auth.middleware';
+import { canalController } from '../controllers/canal.controller';
 
 const router = Router();
 
@@ -8,6 +9,14 @@ const router = Router();
 // TODAS LAS RUTAS REQUIEREN AUTENTICACIÓN
 // ==========================================
 router.use(authenticateToken);
+
+// Los canales son fijos (1–4); administración puede editar su información y áreas.
+router.get('/canales', canalController.getAll);
+router.get('/canales/:id', canalController.getById);
+router.get('/canales/:id/areas', canalController.getAreas);
+router.get('/canales/:id/estudiantes', authorizeRoles('ADMINISTRADOR'), canalController.getStudents);
+router.put('/canales/:id', authorizeRoles('ADMINISTRADOR'), canalController.update);
+router.put('/canales/:id/areas', authorizeRoles('ADMINISTRADOR'), canalController.replaceAreas);
 
 // ==========================================
 // 1. RUTAS DE CURSOS
@@ -54,6 +63,7 @@ router.get('/grupos/:grupoId/horarios', academicoController.getHorariosByGrupo);
 
 // Gestión: Solo Administrador
 router.post('/horarios', authorizeRoles('ADMINISTRADOR'), academicoController.createHorario);
+router.put('/horarios/:id', authorizeRoles('ADMINISTRADOR'), academicoController.updateHorario);
 router.delete('/horarios/:id', authorizeRoles('ADMINISTRADOR'), academicoController.deleteHorario);
 
 export default router;

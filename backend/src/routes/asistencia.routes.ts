@@ -5,6 +5,7 @@ import { asistenciaController } from '../controllers/asistencia.controller';
 const router = Router();
 router.use(authenticateToken);
 router.get('/me', authorizeRoles('ESTUDIANTE'), asistenciaController.getMe);
+router.get('/estudiantes/:estudianteId', authorizeRoles('ADMINISTRADOR'), asistenciaController.getByStudent);
 router.get('/grupos/:grupoId/estudiantes', authorizeRoles('ADMINISTRADOR', 'DOCENTE'), asistenciaController.getStudentsByGroup);
 router.get('/', authorizeRoles('ADMINISTRADOR', 'ADMINISTRATIVO', 'DOCENTE'), asistenciaController.getAll);
 router.get('/sesiones/:id', authorizeRoles('ADMINISTRADOR', 'ADMINISTRATIVO', 'DOCENTE'), asistenciaController.getById);

@@ -63,8 +63,8 @@ export class MatriculaService {
 
   async createMatricula(dto: CreateMatriculaDTO): Promise<IMatriculaDetalle> {
     // 1. Validar campos obligatorios
-    if (!dto.estudiante_id || !dto.grupo_id || !dto.ciclo_id) {
-      const error: any = new Error('El estudiante_id, grupo_id y ciclo_id son obligatorios');
+    if (!dto.estudiante_id || !dto.canal_id || !dto.ciclo_id) {
+      const error: any = new Error('El estudiante_id, canal_id y ciclo_id son obligatorios');
       error.statusCode = 400;
       throw error;
     }
@@ -82,41 +82,29 @@ export class MatriculaService {
       throw error;
     }
 
-    // 3. Verificar que el grupo exista, esté ACTIVO y tenga vacantes disponibles
-    const grupo = await this.academicoRepo.findGrupoById(dto.grupo_id);
-    if (!grupo) {
-      const error: any = new Error(`El grupo con ID ${dto.grupo_id} no existe`);
+    const canal = await this.academicoRepo.findCanal(dto.canal_id);
+    if (!canal || canal.estado !== 'ACTIVO') {
+      const error: any = new Error('El canal seleccionado no existe o está inactivo');
       error.statusCode = 404;
       throw error;
     }
-    if (grupo.estado !== 'ACTIVO') {
-      const error: any = new Error('El grupo seleccionado está inactivo');
+    if (estudiante.canal_id && Number(estudiante.canal_id) !== Number(canal.id)) {
+      const error: any = new Error('El estudiante ya pertenece a otro canal');
       error.statusCode = 400;
       throw error;
     }
 
-    // 4. Verificar que el ciclo académico coincida con el del grupo
-    if (grupo.ciclo_id !== dto.ciclo_id) {
-      const error: any = new Error('El ciclo_id proporcionado no corresponde al ciclo del grupo seleccionado');
+    const ciclo = await this.academicoRepo.findCicloById(dto.ciclo_id);
+    if (!ciclo || ciclo.estado !== 'ACTIVO') {
+      const error: any = new Error('El ciclo académico seleccionado no existe o está inactivo');
       error.statusCode = 400;
       throw error;
     }
 
-    // 5. Control de vacantes disponibles
-    const matriculasActivas = await this.repo.countMatriculasActivasByGrupo(dto.grupo_id);
-    if (matriculasActivas >= grupo.capacidad) {
-      const error: any = new Error(
-        `El grupo "${grupo.nombre}" no tiene vacantes disponibles (${grupo.capacidad}/${grupo.capacidad} ocupadas)`
-      );
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // 6. Restricción de unicidad: un estudiante no puede matricularse dos veces en el mismo grupo y ciclo
-    const duplicada = await this.repo.findDuplicada(dto.estudiante_id, dto.grupo_id, dto.ciclo_id);
+    const duplicada = await this.repo.findDuplicada(dto.estudiante_id, dto.canal_id, dto.ciclo_id);
     if (duplicada) {
       const error: any = new Error(
-        `El estudiante ya tiene una matrícula (${duplicada.codigo_matricula}) en este grupo para este ciclo con estado "${duplicada.estado}"`
+        `El estudiante ya tiene una matrícula (${duplicada.codigo_matricula}) en este canal para este ciclo con estado "${duplicada.estado}"`
       );
       error.statusCode = 409;
       throw error;
@@ -155,7 +143,7 @@ export class MatriculaService {
       {
         codigo_matricula: codigoMatricula,
         estudiante_id: dto.estudiante_id,
-        grupo_id: dto.grupo_id,
+        canal_id: Number(canal.id),
         ciclo_id: dto.ciclo_id
       },
       {

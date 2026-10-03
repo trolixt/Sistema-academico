@@ -9,9 +9,10 @@ export class UsuarioController {
     this.service = service;
   }
 
-  getAll = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getAll = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      res.status(200).json({ success: true, data: await this.service.getAllSafe() });
+      const role = typeof req.query.rol === 'string' ? req.query.rol as any : undefined;
+      res.status(200).json({ success: true, data: await this.service.getAllSafe(role) });
     } catch (error) {
       next(error);
     }
@@ -77,6 +78,27 @@ export class UsuarioController {
     } catch (error) {
       next(error);
     }
+  };
+
+  createSecretaria = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const data = await this.service.createSecretaria(req.body);
+      res.status(201).json({ success: true, message: 'Cuenta de secretaría creada', data });
+    } catch (error) { next(error); }
+  };
+
+  updateSecretaria = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const data = await this.service.updateSecretaria(Number(req.params.id), req.body);
+      res.status(200).json({ success: true, message: 'Datos de secretaría actualizados', data });
+    } catch (error) { next(error); }
+  };
+
+  updateEstado = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const data = await this.service.updateEstado(Number(req.params.id), req.body.estado);
+      res.status(200).json({ success: true, message: 'Estado de la cuenta actualizado', data });
+    } catch (error) { next(error); }
   };
 }
 

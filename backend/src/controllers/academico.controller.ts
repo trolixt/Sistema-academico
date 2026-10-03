@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { academicoService, AcademicoService } from '../services/academico.service';
-import { AuthenticatedRequest, CreateCursoDTO, UpdateCursoDTO, CreateCicloDTO, UpdateCicloDTO, CreateGrupoDTO, UpdateGrupoDTO, CreateHorarioDTO } from '../types';
+import { AuthenticatedRequest, CreateCursoDTO, UpdateCursoDTO, CreateCicloDTO, UpdateCicloDTO, CreateGrupoDTO, UpdateGrupoDTO, CreateHorarioDTO, UpdateHorarioDTO } from '../types';
 
 export class AcademicoController {
   private service: AcademicoService;
@@ -161,12 +161,14 @@ export class AcademicoController {
     try {
       const ciclo_id = req.query.ciclo_id ? Number(req.query.ciclo_id) : undefined;
       const curso_id = req.query.curso_id ? Number(req.query.curso_id) : undefined;
+      const canal_id = req.query.canal_id ? Number(req.query.canal_id) : undefined;
       const docente_id = req.user?.rol === 'DOCENTE' ? req.user.perfil_id : (req.query.docente_id ? Number(req.query.docente_id) : undefined);
       const soloActivos = req.query.activos === 'true';
 
       const grupos = await this.service.getGrupos({
         ciclo_id,
         curso_id,
+        canal_id,
         docente_id,
         soloActivos
       });
@@ -270,6 +272,17 @@ export class AcademicoController {
         message: 'Horario asignado correctamente sin colisiones de docente ni aula',
         data: nuevoHorario
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateHorario = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const id = Number(req.params.id);
+      const dto = req.body as UpdateHorarioDTO;
+      const horario = await this.service.updateHorario(id, dto);
+      res.status(200).json({ success: true, message: 'Horario actualizado correctamente', data: horario });
     } catch (error) {
       next(error);
     }

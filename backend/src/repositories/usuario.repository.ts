@@ -1,4 +1,4 @@
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { RowDataPacket, ResultSetHeader, PoolConnection } from 'mysql2/promise';
 import pool from '../config/database';
 import {
   IUsuario,
@@ -11,20 +11,120 @@ import {
 } from '../types';
 
 export class UsuarioRepository {
-  async findAllSafe(): Promise<Array<{ id: number; nombre_usuario: string; rol: RolUsuario; estado: 'ACTIVO' | 'INACTIVO'; nombres: string | null; apellidos: string | null; correo: string | null }>> {
+  async findAllSafe(rol?: RolUsuario) {
+    const params: string[] = [];
+    let filter = "WHERE u.estado = 'ACTIVO'";
+    if (rol) { filter += ' AND u.rol = ?'; params.push(rol); }
     const [rows] = await pool.execute<RowDataPacket[]>(`
       SELECT u.id, u.nombre_usuario, u.rol, u.estado,
         COALESCE(a.nombres, pa.nombres, d.nombres, e.nombres) AS nombres,
         COALESCE(a.apellidos, pa.apellidos, d.apellidos, e.apellidos) AS apellidos,
-        COALESCE(a.correo, pa.correo, d.correo, e.correo) AS correo
+        COALESCE(a.correo, pa.correo, d.correo, e.correo) AS correo,
+        COALESCE(a.dni, pa.dni, d.dni, e.dni) AS dni,
+        e.id AS estudiante_id, d.id AS docente_id, pa.id AS administrativo_id
       FROM Usuario u
       LEFT JOIN Administrador a ON a.usuario_id = u.id
       LEFT JOIN PersonalAdministrativo pa ON pa.usuario_id = u.id
       LEFT JOIN Docente d ON d.usuario_id = u.id
       LEFT JOIN Estudiante e ON e.usuario_id = u.id
+      ${filter}
       ORDER BY u.id DESC
-    `);
-    return rows as Array<{ id: number; nombre_usuario: string; rol: RolUsuario; estado: 'ACTIVO' | 'INACTIVO'; nombres: string | null; apellidos: string | null; correo: string | null }>;
+    `, params);
+    return rows;
+  }
+
+  async findAccountSafeById(id: number) {
+    const [rows] = await pool.execute<RowDataPacket[]>(`
+      SELECT u.id, u.nombre_usuario, u.rol, u.estado,
+        COALESCE(a.nombres, pa.nombres, d.nombres, e.nombres) AS nombres,
+        COALESCE(a.apellidos, pa.apellidos, d.apellidos, e.apellidos) AS apellidos,
+        COALESCE(a.correo, pa.correo, d.correo, e.correo) AS correo,
+        COALESCE(a.dni, pa.dni, d.dni, e.dni) AS dni,
+        e.id AS estudiante_id, d.id AS docente_id, pa.id AS administrativo_id
+      FROM Usuario u
+      LEFT JOIN Administrador a ON a.usuario_id = u.id
+      LEFT JOIN PersonalAdministrativo pa ON pa.usuario_id = u.id
+      LEFT JOIN Docente d ON d.usuario_id = u.id
+      LEFT JOIN Estudiante e ON e.usuario_id = u.id
+      WHERE u.id = ? LIMIT 1
+    `, [id]);
+    return rows[0] || null;
+  }
+
+  async createSecretaria(data: { password_hash: string; nombres: string; apellidos: string; dni: string; correo?: string }): Promise<number> {
+    const connection: PoolConnection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [userResult] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO Usuario (nombre_usuario, password_hash, rol, estado) VALUES (?, ?, 'ADMINISTRATIVO', 'ACTIVO')`,
+        [`SECRETARIA-${data.dni}`, data.password_hash]
+      );
+      const userId = userResult.insertId;
+      await connection.execute(
+        'INSERT INTO PersonalAdministrativo (usuario_id, nombres, apellidos, dni, correo) VALUES (?, ?, ?, ?, ?)',
+        [userId, data.nombres.trim(), data.apellidos.trim(), data.dni.trim(), data.correo?.trim() || null]
+      );
+      await connection.commit();
+      return userId;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  async findSecretariaByDni(dni: string) {
+    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT u.id, u.estado, pa.nombres, pa.apellidos, pa.dni, pa.correo
+      FROM PersonalAdministrativo pa INNER JOIN Usuario u ON u.id = pa.usuario_id WHERE pa.dni = ? LIMIT 1`, [dni]);
+    return rows[0] || null;
+  }
+
+  async updateSecretaria(usuarioId: number, data: { nombres?: string; apellidos?: string; dni?: string; correo?: string | null }) {
+    const fields: string[] = [];
+    const values: (string | null | number)[] = [];
+    for (const key of ['nombres', 'apellidos', 'dni', 'correo'] as const) {
+      if (data[key] !== undefined) {
+        fields.push(`${key} = ?`);
+        const value = data[key];
+        values.push(typeof value === 'string' ? value.trim() || null : value ?? null);
+      }
+    }
+    if (!fields.length) return;
+    values.push(usuarioId);
+    await pool.execute(`UPDATE PersonalAdministrativo SET ${fields.join(', ')} WHERE usuario_id = ?`, values);
+  }
+
+  async updateAccountStatus(id: number, estado: 'ACTIVO' | 'INACTIVO') {
+    const connection: PoolConnection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [accounts] = await connection.execute<RowDataPacket[]>(`SELECT u.rol, e.id AS estudiante_id, d.id AS docente_id
+        FROM Usuario u LEFT JOIN Estudiante e ON e.usuario_id = u.id LEFT JOIN Docente d ON d.usuario_id = u.id
+        WHERE u.id = ? FOR UPDATE`, [id]);
+      if (!accounts.length) { await connection.rollback(); return false; }
+      const account = accounts[0];
+      if (estado === 'INACTIVO' && account.rol === 'DOCENTE') {
+        const [groups] = await connection.execute<RowDataPacket[]>("SELECT COUNT(*) AS total FROM Grupo WHERE docente_id = ? AND estado = 'ACTIVO'", [account.docente_id]);
+        if (Number(groups[0]?.total) > 0) {
+          const error: any = new Error('Reasigna los grupos activos del docente antes de desactivar su cuenta');
+          error.statusCode = 409;
+          throw error;
+        }
+      }
+      await connection.execute('UPDATE Usuario SET estado = ? WHERE id = ?', [estado, id]);
+      if (account.estudiante_id) {
+        await connection.execute('UPDATE Estudiante SET estado = ? WHERE id = ?', [estado, account.estudiante_id]);
+        if (estado === 'INACTIVO') await connection.execute("UPDATE Matricula SET estado = 'RETIRADA' WHERE estudiante_id = ? AND estado IN ('ACTIVA', 'PENDIENTE_PAGO')", [account.estudiante_id]);
+      }
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   /**

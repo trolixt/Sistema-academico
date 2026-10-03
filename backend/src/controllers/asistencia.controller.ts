@@ -23,6 +23,11 @@ export class AsistenciaController {
     catch (error) { next(error); }
   };
 
+  getByStudent = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try { res.status(200).json({ success: true, data: await asistenciaService.getStudentAttendance(Number(req.params.estudianteId)) }); }
+    catch (error) { next(error); }
+  };
+
   getById = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const docenteId = req.user?.rol === 'DOCENTE' ? req.user.perfil_id : undefined;

@@ -9,12 +9,13 @@ const paymentProjection = `
   CASE WHEN p.estado = 'PENDIENTE' AND p.fecha_vencimiento < CURDATE() THEN 'VENCIDO' ELSE p.estado END AS estado,
   m.codigo_matricula,
   e.id AS estudiante_id, e.nombres AS estudiante_nombres, e.apellidos AS estudiante_apellidos, e.dni AS estudiante_dni,
-  c.nombre AS curso_nombre, g.nombre AS grupo_nombre, ca.nombre AS ciclo_nombre`;
+  c.nombre AS curso_nombre, g.nombre AS grupo_nombre, canal.nombre AS canal_nombre, ca.nombre AS ciclo_nombre`;
 const paymentJoins = `
   FROM Pago p INNER JOIN Matricula m ON p.matricula_id = m.id
   INNER JOIN Estudiante e ON m.estudiante_id = e.id
-  INNER JOIN Grupo g ON m.grupo_id = g.id
-  INNER JOIN Curso c ON g.curso_id = c.id
+  LEFT JOIN Grupo g ON m.grupo_id = g.id
+  LEFT JOIN Curso c ON g.curso_id = c.id
+  INNER JOIN Canal canal ON canal.id = m.canal_id
   INNER JOIN CicloAcademico ca ON m.ciclo_id = ca.id`;
 
 export class PagoRepository {

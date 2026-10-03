@@ -23,16 +23,15 @@ export class AuthService {
    * Autentica a un usuario y genera su token JWT con su perfil correspondiente
    */
   async login(credentials: LoginDTO): Promise<LoginResponseDTO> {
-    const { nombre_usuario, password } = credentials;
+    const { id_usuario, password } = credentials;
 
-    if (!nombre_usuario || !password) {
-      const error: any = new Error('El nombre de usuario y la contraseña son requeridos');
+    if (!id_usuario || !password || !/^\d+$/.test(String(id_usuario).trim())) {
+      const error: any = new Error('El ID y la contraseña son requeridos');
       error.statusCode = 400;
       throw error;
     }
 
-    // 1. Buscar el usuario en la base de datos
-    const usuario = await this.userRepo.findByNombreUsuario(nombre_usuario.trim());
+    const usuario = await this.userRepo.findById(Number(id_usuario));
     if (!usuario) {
       const error: any = new Error('Credenciales inválidas');
       error.statusCode = 401;

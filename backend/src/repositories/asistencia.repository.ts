@@ -72,9 +72,10 @@ export class AsistenciaRepository {
   }
 
   async findEnrolledStudents(grupoId: number) {
-    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT e.id, e.codigo_estudiante, e.nombres, e.apellidos
-      FROM Matricula m INNER JOIN Estudiante e ON e.id = m.estudiante_id
-      WHERE m.grupo_id = ? AND m.estado = 'ACTIVA' ORDER BY e.apellidos, e.nombres`, [grupoId]);
+    const [rows] = await pool.execute<RowDataPacket[]>(`SELECT DISTINCT e.id, e.codigo_estudiante, e.nombres, e.apellidos
+      FROM Grupo g INNER JOIN Estudiante e ON e.canal_id = g.canal_id
+      INNER JOIN Matricula m ON m.estudiante_id = e.id AND m.canal_id = g.canal_id AND m.estado = 'ACTIVA'
+      WHERE g.id = ? AND e.estado = 'ACTIVO' ORDER BY e.apellidos, e.nombres`, [grupoId]);
     return rows;
   }
 
@@ -106,9 +107,12 @@ export class AsistenciaRepository {
       await connection.beginTransaction();
       for (const detail of details) {
         await connection.execute(`INSERT INTO DetalleAsistencia (sesion_asistencia_id, estudiante_id, estado_asistencia)
-          SELECT ?, m.estudiante_id, ? FROM Matricula m
-          INNER JOIN SesionAsistencia sa ON sa.grupo_id = m.grupo_id AND sa.id = ?
-          WHERE m.estudiante_id = ? AND m.estado = 'ACTIVA'
+          SELECT ?, e.id, ? FROM Estudiante e
+          INNER JOIN SesionAsistencia sa ON sa.id = ?
+          INNER JOIN Grupo g ON g.id = sa.grupo_id AND g.canal_id = e.canal_id
+          WHERE e.id = ? AND e.estado = 'ACTIVO' AND EXISTS (
+            SELECT 1 FROM Matricula m WHERE m.estudiante_id = e.id AND m.canal_id = g.canal_id AND m.estado = 'ACTIVA'
+          )
           ON DUPLICATE KEY UPDATE estado_asistencia = VALUES(estado_asistencia)`,
         [sessionId, detail.estado_asistencia, sessionId, detail.estudiante_id]);
       }

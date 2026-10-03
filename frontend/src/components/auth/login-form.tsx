@@ -18,7 +18,7 @@ export function LoginForm() {
     setEnviando(true);
     const form = new FormData(event.currentTarget);
     try {
-      await iniciarSesion(String(form.get("usuario")), String(form.get("password")));
+      await iniciarSesion(String(form.get("id_usuario")), String(form.get("password")));
       router.replace("/dashboard");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo validar la cuenta.");
@@ -34,9 +34,9 @@ export function LoginForm() {
       <small className="login-footer">Sistema de gestión académica</small>
     </section>
     <section className="login-form-panel"><div className="login-toolbar"><ThemeToggle /></div><div className="login-card">
-      <span className="eyebrow">ACCESO SEGURO</span><h2>Iniciar sesión</h2><p>Ingresa el usuario y la contraseña asignados por administración.</p>
+      <span className="eyebrow">ACCESO SEGURO</span><h2>Iniciar sesión</h2><p>Ingresa tu ID de acceso y la contraseña asignada.</p>
       <form onSubmit={submit} className="form-stack">
-        <label>Usuario<input name="usuario" autoComplete="username" required placeholder="Tu usuario" /></label>
+        <label>ID de acceso<input name="id_usuario" type="number" inputMode="numeric" autoComplete="username" required placeholder="Ej. 12" /></label>
         <label>Contraseña<input name="password" type="password" autoComplete="current-password" required placeholder="Tu contraseña" /></label>
         {error && <div className="alert error" role="alert">{error}</div>}
         <button className="button primary full" disabled={enviando}>{enviando ? "Verificando…" : "Entrar al sistema"}</button>

@@ -1,11 +1,12 @@
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthenticatedRequest, JWTPayload, RolUsuario } from '../types';
+import pool from '../config/database';
 
 /**
  * Middleware para validar el JWT en los headers de autorización
  */
-export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+export const authenticateToken = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
@@ -19,16 +20,24 @@ export const authenticateToken = (req: AuthenticatedRequest, res: Response, next
 
   const jwtSecret = process.env.JWT_SECRET || 'sistema_academia_secret_key_2026';
 
+  let decoded: JWTPayload;
   try {
-    const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
+    decoded = jwt.verify(token, jwtSecret) as JWTPayload;
+  } catch {
+    res.status(403).json({ success: false, message: 'Token inválido o expirado' });
+    return;
+  }
+
+  try {
+    const [rows] = await pool.execute<any[]>('SELECT estado FROM Usuario WHERE id = ? LIMIT 1', [decoded.id]);
+    if (!rows.length || rows[0].estado !== 'ACTIVO') {
+      res.status(401).json({ success: false, message: 'La cuenta está desactivada' });
+      return;
+    }
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(403).json({
-      success: false,
-      message: 'Token inválido o expirado'
-    });
-    return;
+    next(error);
   }
 };
 

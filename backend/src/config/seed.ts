@@ -22,6 +22,7 @@ async function runSeed() {
       ['admin']
     );
 
+    let adminId = Number(existingAdmin[0]?.id || 0);
     if (existingAdmin.length === 0) {
       // Crear Usuario Admin
       const [userResult] = await pool.execute<ResultSetHeader>(
@@ -30,6 +31,7 @@ async function runSeed() {
       );
 
       const usuarioId = userResult.insertId;
+      adminId = usuarioId;
 
       // Crear Perfil de Administrador
       await pool.execute(
@@ -38,11 +40,11 @@ async function runSeed() {
       );
 
       console.log('✅ [SEED] Usuario administrador creado con éxito:');
-      console.log('   - Usuario: admin');
+      console.log('   - ID de acceso:', adminId);
       console.log('   - Contraseña:', defaultPassword);
       console.log('   - Rol: ADMINISTRADOR');
     } else {
-      console.log('ℹ️ [SEED] El usuario "admin" ya existe en la base de datos.');
+      console.log('ℹ️ [SEED] El administrador ya existe. ID de acceso:', adminId);
     }
 
     console.log('✨ [SEED] Proceso finalizado.');

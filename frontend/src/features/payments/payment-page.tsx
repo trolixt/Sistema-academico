@@ -8,7 +8,7 @@ type PaymentStatus = "PENDIENTE" | "PAGADO" | "VENCIDO" | "ANULADO";
 type Payment = {
   id: number; matricula_id: number; codigo_pago: string | null; codigo_matricula: string; estudiante_id: number;
   estudiante_nombres: string; estudiante_apellidos: string; estudiante_dni: string;
-  curso_nombre: string; grupo_nombre: string; ciclo_nombre: string; concepto: string;
+  canal_nombre: string; curso_nombre: string | null; grupo_nombre: string | null; ciclo_nombre: string; concepto: string;
   tipo_pago: "MATRICULA" | "MENSUALIDAD" | "OTRO"; periodo: string | null;
   fecha_vencimiento: string | null; monto: number; monto_recibido: number | null; fecha: string | null;
   metodo_pago: "EFECTIVO" | "YAPE" | "TRANSFERENCIA" | null; referencia_operacion: string | null;
@@ -45,7 +45,7 @@ export function PaymentPage() {
   const filtered = useMemo(() => payments.filter((payment) => {
     const query = search.trim().toLocaleLowerCase();
     const searchable = [payment.codigo_pago, payment.codigo_matricula, payment.estudiante_nombres,
-      payment.estudiante_apellidos, payment.estudiante_dni, payment.curso_nombre, payment.ciclo_nombre,
+      payment.estudiante_apellidos, payment.estudiante_dni, payment.canal_nombre, payment.ciclo_nombre,
       payment.concepto, payment.periodo, payment.referencia_operacion].join(" ").toLocaleLowerCase();
     return (status === "TODOS" || payment.estado === status) && (!query || searchable.includes(query));
   }), [payments, status, search]);
@@ -120,7 +120,7 @@ export function PaymentPage() {
       {loading ? <tr><td colSpan={columns} className="table-message">Consultando pagos…</td></tr> : filtered.length === 0 ? <tr><td colSpan={columns} className="table-message">No hay cuotas que coincidan con los filtros.</td></tr> : filtered.map((payment) => <tr key={payment.id}>
         <td>{payment.fecha ? formatDate(payment.fecha) : payment.fecha_vencimiento ? formatDate(payment.fecha_vencimiento) : "—"}</td>
         {!isStudent && <td><strong>{payment.estudiante_nombres} {payment.estudiante_apellidos}</strong><small className="table-subtext">DNI {payment.estudiante_dni} · {payment.codigo_matricula}</small></td>}
-        <td>{payment.curso_nombre}<small className="table-subtext">{payment.ciclo_nombre} · {payment.grupo_nombre}</small></td>
+        <td>{payment.canal_nombre}<small className="table-subtext">{payment.ciclo_nombre}</small></td>
         <td>{payment.tipo_pago === "MENSUALIDAD" ? `Mensualidad ${monthLabel(payment.periodo)}` : payment.tipo_pago === "MATRICULA" ? "Matrícula inicial" : payment.concepto}</td>
         <td><strong className="payment-code">{payment.codigo_pago || "Sin código"}</strong>{isStudent && (payment.estado === "PENDIENTE" || payment.estado === "VENCIDO") && payment.codigo_pago && <button className="button secondary small" onClick={() => void copyCode(payment)}>{copiedCode === payment.codigo_pago ? "Copiado" : "Copiar código"}</button>}</td>
         {!isStudent && <td>{payment.metodo_pago ? methodLabel(payment.metodo_pago) : "—"}<small className="table-subtext">{payment.referencia_operacion || ""}</small></td>}
@@ -135,7 +135,7 @@ export function PaymentPage() {
     {showForm && <div className="modal-backdrop"><section className="form-dialog" role="dialog" aria-modal="true" aria-labelledby="payment-form-title"><div className="dialog-heading"><div><span className="eyebrow">CAJA DE SECRETARÍA</span><h2 id="payment-form-title">Registrar cobro recibido</h2></div><button className="icon-button" onClick={() => setShowForm(false)} aria-label="Cerrar">×</button></div>
       <form onSubmit={(event) => void lookupCharge(event)} className="form-stack dialog-form"><label>Código de pago<input value={code} onChange={(event) => { setCode(event.target.value.toUpperCase()); setCharge(null); }} placeholder="SA-0000000001" required /></label><button className="button secondary" type="submit" disabled={lookupBusy || !code.trim()}>{lookupBusy ? "Buscando…" : "Buscar cuota"}</button></form>
       {charge && <form onSubmit={submitPayment} className="form-stack dialog-form cashier-form">
-        <div className="payment-quote"><strong>{charge.estudiante_nombres} {charge.estudiante_apellidos}</strong><span>{charge.curso_nombre} · {charge.grupo_nombre}</span><span>{charge.concepto} · {charge.codigo_pago}</span><strong>Importe pendiente: {currency(Number(charge.monto))}</strong></div>
+        <div className="payment-quote"><strong>{charge.estudiante_nombres} {charge.estudiante_apellidos}</strong><span>{charge.canal_nombre} · {charge.ciclo_nombre}</span><span>{charge.concepto} · {charge.codigo_pago}</span><strong>Importe pendiente: {currency(Number(charge.monto))}</strong></div>
         <label>Importe recibido (S/)<input name="monto_recibido" type="number" min="0.01" step="0.01" defaultValue={Number(charge.monto).toFixed(2)} required /></label>
         <label>Forma de pago<select name="metodo_pago" required defaultValue=""><option value="" disabled>Seleccionar…</option><option value="YAPE">Yape recibido</option><option value="TRANSFERENCIA">Transferencia bancaria recibida</option><option value="EFECTIVO">Efectivo recibido en caja</option></select></label>
         <label>Número de operación (Yape o banco)<input name="referencia_operacion" maxLength={100} placeholder="Escribe la operación recibida" /></label>

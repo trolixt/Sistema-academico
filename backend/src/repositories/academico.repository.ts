@@ -14,10 +14,21 @@ import {
   FiltrosGrupoDTO,
   IHorario,
   CreateHorarioDTO,
+  UpdateHorarioDTO,
   DiaSemana
 } from '../types';
 
 export class AcademicoRepository {
+  async findCanal(id: number) {
+    const [rows] = await pool.execute<RowDataPacket[]>('SELECT id, estado FROM Canal WHERE id = ?', [id]);
+    return rows[0] || null;
+  }
+
+  async isCursoInCanal(canalId: number, cursoId: number) {
+    const [rows] = await pool.execute<RowDataPacket[]>('SELECT 1 FROM CanalCurso WHERE canal_id = ? AND curso_id = ? LIMIT 1', [canalId, cursoId]);
+    return rows.length > 0;
+  }
+
   // ==========================================
   // 1. CURSOS
   // ==========================================
@@ -47,6 +58,11 @@ export class AcademicoRepository {
     const [rows] = await pool.execute<RowDataPacket[]>(query, [id]);
     if (rows.length === 0) return null;
     return rows[0] as ICurso;
+  }
+
+  async findCursoByName(name: string): Promise<ICurso | null> {
+    const [rows] = await pool.execute<RowDataPacket[]>('SELECT id, nombre, descripcion, estado FROM Curso WHERE LOWER(nombre) = LOWER(?) LIMIT 1', [name.trim()]);
+    return rows[0] ? rows[0] as ICurso : null;
   }
 
   /**
@@ -200,22 +216,24 @@ export class AcademicoRepository {
   async findGrupos(filtros?: FiltrosGrupoDTO): Promise<IGrupoDetalle[]> {
     let query = `
       SELECT 
-        g.id, g.nombre, g.curso_id, g.docente_id, g.ciclo_id, g.capacidad, g.estado,
+        g.id, g.nombre, g.curso_id, g.canal_id, g.docente_id, g.ciclo_id, g.capacidad, g.estado,
         c.nombre AS curso_nombre, c.descripcion AS curso_descripcion,
+        canal.nombre AS canal_nombre,
         d.nombres AS docente_nombres, d.apellidos AS docente_apellidos, d.codigo_docente AS docente_codigo,
         ca.nombre AS ciclo_nombre, ca.fecha_inicio AS ciclo_fecha_inicio, ca.fecha_fin AS ciclo_fecha_fin,
         CAST(COALESCE(m.matriculados_count, 0) AS SIGNED) AS matriculados_count,
         CAST((g.capacidad - COALESCE(m.matriculados_count, 0)) AS SIGNED) AS vacantes_disponibles
       FROM Grupo g
       INNER JOIN Curso c ON g.curso_id = c.id
+      INNER JOIN Canal canal ON g.canal_id = canal.id
       INNER JOIN Docente d ON g.docente_id = d.id
       INNER JOIN CicloAcademico ca ON g.ciclo_id = ca.id
       LEFT JOIN (
-        SELECT grupo_id, COUNT(*) AS matriculados_count
+        SELECT canal_id, COUNT(DISTINCT estudiante_id) AS matriculados_count
         FROM Matricula
         WHERE estado = 'ACTIVA'
-        GROUP BY grupo_id
-      ) m ON g.id = m.grupo_id
+        GROUP BY canal_id
+      ) m ON g.canal_id = m.canal_id
       WHERE 1 = 1
     `;
 
@@ -229,12 +247,16 @@ export class AcademicoRepository {
       query += ' AND g.curso_id = ?';
       params.push(filtros.curso_id);
     }
+    if (filtros?.canal_id) {
+      query += ' AND g.canal_id = ?';
+      params.push(filtros.canal_id);
+    }
     if (filtros?.docente_id) {
       query += ' AND g.docente_id = ?';
       params.push(filtros.docente_id);
     }
     if (filtros?.estudiante_id) {
-      query += ` AND EXISTS (SELECT 1 FROM Matricula m2 WHERE m2.grupo_id = g.id AND m2.estudiante_id = ? AND m2.estado = 'ACTIVA')`;
+      query += ` AND EXISTS (SELECT 1 FROM Matricula m2 WHERE m2.canal_id = g.canal_id AND m2.estudiante_id = ? AND m2.estado = 'ACTIVA')`;
       params.push(filtros.estudiante_id);
     }
     if (filtros?.soloActivos) {
@@ -253,22 +275,24 @@ export class AcademicoRepository {
   async findGrupoById(id: number): Promise<IGrupoDetalle | null> {
     const query = `
       SELECT 
-        g.id, g.nombre, g.curso_id, g.docente_id, g.ciclo_id, g.capacidad, g.estado,
+        g.id, g.nombre, g.curso_id, g.canal_id, g.docente_id, g.ciclo_id, g.capacidad, g.estado,
         c.nombre AS curso_nombre, c.descripcion AS curso_descripcion,
+        canal.nombre AS canal_nombre,
         d.nombres AS docente_nombres, d.apellidos AS docente_apellidos, d.codigo_docente AS docente_codigo,
         ca.nombre AS ciclo_nombre, ca.fecha_inicio AS ciclo_fecha_inicio, ca.fecha_fin AS ciclo_fecha_fin,
         CAST(COALESCE(m.matriculados_count, 0) AS SIGNED) AS matriculados_count,
         CAST((g.capacidad - COALESCE(m.matriculados_count, 0)) AS SIGNED) AS vacantes_disponibles
       FROM Grupo g
       INNER JOIN Curso c ON g.curso_id = c.id
+      INNER JOIN Canal canal ON g.canal_id = canal.id
       INNER JOIN Docente d ON g.docente_id = d.id
       INNER JOIN CicloAcademico ca ON g.ciclo_id = ca.id
       LEFT JOIN (
-        SELECT grupo_id, COUNT(*) AS matriculados_count
+        SELECT canal_id, COUNT(DISTINCT estudiante_id) AS matriculados_count
         FROM Matricula
         WHERE estado = 'ACTIVA'
-        GROUP BY grupo_id
-      ) m ON g.id = m.grupo_id
+        GROUP BY canal_id
+      ) m ON g.canal_id = m.canal_id
       WHERE g.id = ?
       LIMIT 1
     `;
@@ -283,12 +307,13 @@ export class AcademicoRepository {
    */
   async createGrupo(data: CreateGrupoDTO): Promise<number> {
     const query = `
-      INSERT INTO Grupo (nombre, curso_id, docente_id, ciclo_id, capacidad, estado)
-      VALUES (?, ?, ?, ?, ?, 'ACTIVO')
+      INSERT INTO Grupo (nombre, curso_id, canal_id, docente_id, ciclo_id, capacidad, estado)
+      VALUES (?, ?, ?, ?, ?, ?, 'ACTIVO')
     `;
     const [result] = await pool.execute<ResultSetHeader>(query, [
       data.nombre.trim(),
       data.curso_id,
+      data.canal_id,
       data.docente_id,
       data.ciclo_id,
       data.capacidad !== undefined ? data.capacidad : 30
@@ -310,6 +335,10 @@ export class AcademicoRepository {
     if (data.curso_id !== undefined) {
       fields.push('curso_id = ?');
       params.push(data.curso_id);
+    }
+    if (data.canal_id !== undefined) {
+      fields.push('canal_id = ?');
+      params.push(data.canal_id);
     }
     if (data.docente_id !== undefined) {
       fields.push('docente_id = ?');
@@ -400,6 +429,20 @@ export class AcademicoRepository {
     return result.insertId;
   }
 
+  async updateHorario(id: number, data: UpdateHorarioDTO): Promise<boolean> {
+    const fields: string[] = [];
+    const params: any[] = [];
+    if (data.grupo_id !== undefined) { fields.push('grupo_id = ?'); params.push(data.grupo_id); }
+    if (data.dia_semana !== undefined) { fields.push('dia_semana = ?'); params.push(data.dia_semana); }
+    if (data.hora_inicio !== undefined) { fields.push('hora_inicio = ?'); params.push(data.hora_inicio); }
+    if (data.hora_fin !== undefined) { fields.push('hora_fin = ?'); params.push(data.hora_fin); }
+    if (data.aula !== undefined) { fields.push('aula = ?'); params.push(data.aula.trim()); }
+    if (fields.length === 0) return true;
+    params.push(id);
+    const [result] = await pool.execute<ResultSetHeader>(`UPDATE Horario SET ${fields.join(', ')} WHERE id = ?`, params);
+    return result.affectedRows > 0;
+  }
+
   /**
    * Elimina un horario
    */
@@ -417,7 +460,8 @@ export class AcademicoRepository {
     diaSemana: DiaSemana,
     horaInicio: string,
     horaFin: string,
-    excludeGrupoId?: number
+    excludeGrupoId?: number,
+    excludeHorarioId?: number
   ): Promise<any | null> {
     let query = `
       SELECT h.*, g.nombre AS grupo_nombre, c.nombre AS curso_nombre
@@ -435,6 +479,10 @@ export class AcademicoRepository {
       query += ' AND g.id != ?';
       params.push(excludeGrupoId);
     }
+    if (excludeHorarioId) {
+      query += ' AND h.id != ?';
+      params.push(excludeHorarioId);
+    }
 
     query += ' LIMIT 1';
 
@@ -450,7 +498,8 @@ export class AcademicoRepository {
     diaSemana: DiaSemana,
     horaInicio: string,
     horaFin: string,
-    excludeGrupoId?: number
+    excludeGrupoId?: number,
+    excludeHorarioId?: number
   ): Promise<any | null> {
     let query = `
       SELECT h.*, g.nombre AS grupo_nombre, c.nombre AS curso_nombre
@@ -467,6 +516,10 @@ export class AcademicoRepository {
     if (excludeGrupoId) {
       query += ' AND g.id != ?';
       params.push(excludeGrupoId);
+    }
+    if (excludeHorarioId) {
+      query += ' AND h.id != ?';
+      params.push(excludeHorarioId);
     }
 
     query += ' LIMIT 1';

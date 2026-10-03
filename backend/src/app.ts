@@ -9,7 +9,7 @@ import docenteRoutes from './routes/docente.routes';
 import academicoRoutes from './routes/academico.routes';
 import matriculaRoutes from './routes/matricula.routes';
 import pagoRoutes from './routes/pago.routes';
-import evaluacionRoutes from './routes/evaluacion.routes';
+import simulacroRoutes from './routes/simulacro.routes';
 import asistenciaRoutes from './routes/asistencia.routes';
 
 // Middlewares
@@ -45,7 +45,7 @@ app.use('/api/docentes', docenteRoutes);
 app.use('/api/academicos', academicoRoutes);
 app.use('/api/matriculas', matriculaRoutes);
 app.use('/api/pagos', pagoRoutes);
-app.use('/api/evaluaciones', evaluacionRoutes);
+app.use('/api/simulacros', simulacroRoutes);
 app.use('/api/asistencias', asistenciaRoutes);
 
 // Manejadores de Errores

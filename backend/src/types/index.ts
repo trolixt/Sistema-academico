@@ -57,6 +57,8 @@ export interface IDocente {
 export interface IEstudiante {
   id: number;
   usuario_id: number;
+  canal_id: number | null;
+  canal_nombre?: string | null;
   codigo_estudiante: string;
   nombres: string;
   apellidos: string;
@@ -75,7 +77,7 @@ export type PerfilUsuario = IAdministrador | IPersonalAdministrativo | IDocente 
 // DTOs DE AUTENTICACIÓN
 // ==========================================
 export interface LoginDTO {
-  nombre_usuario: string;
+  id_usuario: number | string;
   password: string;
 }
 
@@ -165,6 +167,7 @@ export interface CreateHorarioDTO {
 }
 
 export interface UpdateHorarioDTO {
+  grupo_id?: number;
   dia_semana?: DiaSemana;
   hora_inicio?: string;
   hora_fin?: string;
@@ -178,6 +181,7 @@ export interface IGrupo {
   id: number;
   nombre: string;
   curso_id: number;
+  canal_id: number;
   docente_id: number;
   ciclo_id: number;
   capacidad: number;
@@ -187,6 +191,7 @@ export interface IGrupo {
 export interface CreateGrupoDTO {
   nombre: string;
   curso_id: number;
+  canal_id: number;
   docente_id: number;
   ciclo_id: number;
   capacidad?: number;
@@ -195,6 +200,7 @@ export interface CreateGrupoDTO {
 export interface UpdateGrupoDTO {
   nombre?: string;
   curso_id?: number;
+  canal_id?: number;
   docente_id?: number;
   ciclo_id?: number;
   capacidad?: number;
@@ -202,6 +208,7 @@ export interface UpdateGrupoDTO {
 }
 
 export interface IGrupoDetalle extends IGrupo {
+  canal_nombre: string;
   curso_nombre: string;
   curso_descripcion?: string | null;
   docente_nombres: string;
@@ -216,6 +223,7 @@ export interface IGrupoDetalle extends IGrupo {
 }
 
 export interface FiltrosGrupoDTO {
+  canal_id?: number;
   ciclo_id?: number;
   curso_id?: number;
   docente_id?: number;
@@ -227,6 +235,7 @@ export interface FiltrosGrupoDTO {
 // ESTUDIANTES (DTOs TRANSACCIONALES)
 // ==========================================
 export interface CreateEstudianteDTO {
+  canal_id?: number;
   nombres: string;
   apellidos: string;
   dni: string;
@@ -239,6 +248,7 @@ export interface CreateEstudianteDTO {
 }
 
 export interface UpdateEstudianteDTO {
+  canal_id?: number | null;
   nombres?: string;
   apellidos?: string;
   dni?: string;
@@ -261,7 +271,8 @@ export interface IMatricula {
   id: number;
   codigo_matricula: string;
   estudiante_id: number;
-  grupo_id: number;
+  canal_id: number;
+  grupo_id: number | null;
   ciclo_id: number;
   estado: EstadoMatricula;
   fecha_registro: string | Date;
@@ -269,7 +280,7 @@ export interface IMatricula {
 
 export interface CreateMatriculaDTO {
   estudiante_id: number;
-  grupo_id: number;
+  canal_id: number;
   ciclo_id: number;
   pago_inicial: {
     concepto: string;
@@ -288,13 +299,15 @@ export interface IMatriculaDetalle extends IMatricula {
   estudiante_dni: string;
   estudiante_codigo: string;
   estudiante_correo?: string | null;
-  grupo_nombre: string;
-  curso_id: number;
-  curso_nombre: string;
+  grupo_nombre: string | null;
+  curso_id: number | null;
+  canal_id: number;
+  canal_nombre?: string;
+  curso_nombre: string | null;
   ciclo_nombre: string;
-  docente_id: number;
-  docente_nombres: string;
-  docente_apellidos: string;
+  docente_id: number | null;
+  docente_nombres: string | null;
+  docente_apellidos: string | null;
 }
 
 // ==========================================
@@ -329,8 +342,9 @@ export interface IPagoDetalle extends IPago {
   estudiante_nombres: string;
   estudiante_apellidos: string;
   estudiante_dni: string;
-  curso_nombre: string;
-  grupo_nombre: string;
+  curso_nombre: string | null;
+  grupo_nombre: string | null;
+  canal_nombre: string;
   ciclo_nombre: string;
 }
 

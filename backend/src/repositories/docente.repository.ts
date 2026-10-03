@@ -37,6 +37,7 @@ export class DocenteRepository {
              u.nombre_usuario, u.estado AS estado_usuario
       FROM Docente d
       INNER JOIN Usuario u ON d.usuario_id = u.id
+      WHERE u.estado = 'ACTIVO'
       ORDER BY d.apellidos ASC, d.nombres ASC
     `;
     const [rows] = await pool.execute<RowDataPacket[]>(query);
